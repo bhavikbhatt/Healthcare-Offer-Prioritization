@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # 04 - Model Inference & Offer Recommendations
-# MAGIC 
+# MAGIC
 # MAGIC This notebook demonstrates how to use the trained model to generate
 # MAGIC personalized offer recommendations for healthcare members.
 
@@ -34,7 +34,7 @@ import mlflow.sklearn
 
 # Model configuration
 MODEL_NAME = "healthcare_offer_prioritizer"
-CATALOG_NAME = "healthcare_demo"
+CATALOG_NAME = "demos"
 SCHEMA_NAME = "offer_prioritization"
 
 # For Unity Catalog: f"{CATALOG_NAME}.{SCHEMA_NAME}.{MODEL_NAME}"
@@ -151,7 +151,7 @@ def wrap_loaded_model(
 
 # MAGIC %md
 # MAGIC ### Configuration: Choose Model Source
-# MAGIC 
+# MAGIC
 # MAGIC Set `USE_REGISTRY_MODEL = True` to load from Unity Catalog, or `False` to train fresh.
 
 # COMMAND ----------
@@ -608,11 +608,11 @@ result = get_realtime_recommendations(
 # COMMAND ----------
 
 # # Save recommendations to Delta table
-# recommendations_spark = spark.createDataFrame(all_recommendations)
-# recommendations_spark.write.mode("overwrite").saveAsTable(
-#     f"{CATALOG_NAME}.{SCHEMA_NAME}.offer_recommendations"
-# )
-# print("✓ Saved recommendations to Delta table")
+recommendations_spark = spark.createDataFrame(all_recommendations)
+recommendations_spark.write.mode("overwrite").saveAsTable(
+    f"{CATALOG_NAME}.{SCHEMA_NAME}.offer_recommendations"
+)
+print("✓ Saved recommendations to Delta table")
 
 # COMMAND ----------
 
@@ -662,7 +662,7 @@ print("\n" + "=" * 60)
 
 # MAGIC %md
 # MAGIC ## Per-Member Feature Importance (SHAP Explanations)
-# MAGIC 
+# MAGIC
 # MAGIC This section computes feature importance for each member's recommendations,
 # MAGIC enabling an LLM to explain why specific offers were selected.
 
@@ -770,8 +770,8 @@ def compute_member_explanations(
 
 # COMMAND ----------
 
-# Compute explanations for sample members
-sample_member_ids = features_df['member_id'].sample(10, random_state=42).tolist()
+# Compute explanations for members (increase sample size for more coverage)
+sample_member_ids = features_df['member_id'].sample(100, random_state=42).tolist()
 sample_recs = all_recommendations[all_recommendations['member_id'].isin(sample_member_ids)]
 
 explanations_df = compute_member_explanations(
@@ -951,7 +951,7 @@ print(sample_prompt[:2000] + "..." if len(sample_prompt) > 2000 else sample_prom
 
 # MAGIC %md
 # MAGIC ## LLM-Generated Offer Reasoning
-# MAGIC 
+# MAGIC
 # MAGIC This section uses an LLM to generate personalized 3-4 sentence explanations
 # MAGIC for why each offer was recommended to a member based on feature importance.
 
@@ -959,6 +959,8 @@ print(sample_prompt[:2000] + "..." if len(sample_prompt) > 2000 else sample_prom
 
 from openai import OpenAI
 import os
+
+# MLflow tracing is enabled - each LLM call will be traced
 
 def get_llm_client():
     """
@@ -988,7 +990,7 @@ def get_llm_client():
         
         # Test the connection with a simple check
         print(f"   Using Databricks Foundation Model API at: {base_url}")
-        return client, "databricks-meta-llama-3-1-70b-instruct"
+        return client, "databricks-gpt-5-1/invocations"
         
     except Exception as e:
         print(f"   ⚠️ Databricks Foundation Model API not available: {e}")
@@ -1001,7 +1003,7 @@ def get_llm_client():
         print("   Trying Databricks SDK...")
         w = WorkspaceClient()
         # Return a wrapper that uses the SDK
-        return ("databricks_sdk", w), "databricks-meta-llama-3-1-70b-instruct"
+        return ("databricks_sdk", w), "databricks-gpt-5-1"
         
     except Exception as e:
         print(f"   ⚠️ Databricks SDK not available: {e}")
@@ -1016,7 +1018,7 @@ def get_llm_client():
     
     print(f"   Using API at: {base_url}")
     client = OpenAI(api_key=api_key, base_url=base_url)
-    model = "gpt-4o-mini" if "openai.com" in base_url else "databricks-meta-llama-3-1-70b-instruct"
+    model = "gpt-4o-mini" if "openai.com" in base_url else "databricks-gpt-5-1"
     return client, model
 
 # COMMAND ----------
@@ -1156,7 +1158,7 @@ def generate_all_offer_reasonings(
 
 # MAGIC %md
 # MAGIC ### LLM Configuration
-# MAGIC 
+# MAGIC
 # MAGIC Configure the LLM endpoint below. Options:
 # MAGIC 1. **Databricks Foundation Model API** (default) - uses workspace token automatically
 # MAGIC 2. **Custom Model Serving Endpoint** - set `LLM_ENDPOINT_NAME` to your endpoint name
@@ -1165,7 +1167,7 @@ def generate_all_offer_reasonings(
 # COMMAND ----------
 
 # LLM Configuration - update these as needed
-LLM_ENDPOINT_NAME = "databricks-meta-llama-3-1-70b-instruct"  # Change to your endpoint name if using custom serving
+LLM_ENDPOINT_NAME = "databricks-gpt-5-1"  # Change to your endpoint name if using custom serving
 
 # Alternative: Use a specific Databricks Model Serving endpoint
 # LLM_ENDPOINT_NAME = "your-custom-llm-endpoint"
@@ -1177,7 +1179,7 @@ print("🤖 Initializing LLM client...")
 llm_client, llm_model = get_llm_client()
 
 # Override model name if custom endpoint specified
-if llm_client and LLM_ENDPOINT_NAME != "databricks-meta-llama-3-1-70b-instruct":
+if llm_client and LLM_ENDPOINT_NAME != "databricks-gpt-oss-120b":
     llm_model = LLM_ENDPOINT_NAME
     print(f"   Using custom endpoint: {llm_model}")
 
@@ -1219,14 +1221,22 @@ else:
 
 # COMMAND ----------
 
-# Generate reasoning for sample members
+# Generate reasoning for sample members (wrapped in MLflow run for tracing)
 if llm_client:
-    reasoned_explanations = generate_all_offer_reasonings(
-        llm_export=llm_export,
-        client=llm_client,
-        model=llm_model,
-        max_members=5  # Limit for demo; remove for full run
-    )
+    with mlflow.start_run(run_name="llm_reasoning_generation", nested=True):
+        mlflow.log_param("llm_model", llm_model)
+        mlflow.log_param("max_members", 100)
+        
+        reasoned_explanations = generate_all_offer_reasonings(
+            llm_export=llm_export,
+            client=llm_client,
+            model=llm_model,
+            max_members=100  # Increase for more coverage; set to None for all members
+        )
+        
+        if reasoned_explanations:
+            mlflow.log_metric("members_processed", len(reasoned_explanations))
+            mlflow.log_metric("total_reasonings", sum(len(m['recommendations']) for m in reasoned_explanations))
 else:
     reasoned_explanations = None
     print("⚠️ Skipping reasoning generation - no LLM client available")
@@ -1270,6 +1280,11 @@ if reasoned_explanations:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### Save Recommendations with Reasoning to a Delta Table
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ### Export Recommendations with Reasoning
 
 # COMMAND ----------
@@ -1308,3 +1323,82 @@ if reasoned_explanations:
     print(f"   - /tmp/recommendations_with_reasoning.json")
     print(f"   - /tmp/recommendations_with_reasoning.csv")
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Final Output: Consolidated Delta Table
+# MAGIC 
+# MAGIC Save all member profiles, features, recommendations, SHAP explanations, and LLM reasoning to a single Delta table.
+
+# COMMAND ----------
+
+# Build consolidated output with all data
+print("📦 Building consolidated output table...")
+
+# Start with reasoning data if available, otherwise use explanations
+if reasoned_explanations:
+    # Build from reasoned explanations (includes LLM reasoning)
+    records = []
+    for member in reasoned_explanations:
+        member_features = features_df[features_df['member_id'] == member['member_id']].iloc[0]
+        for rec in member['recommendations']:
+            records.append({
+                # Identifiers
+                'member_id': member['member_id'],
+                'offer_id': rec['offer_id'],
+                'offer_name': rec['offer_name'],
+                'rank': rec['rank'],
+                'priority_score': rec['priority_score'],
+                # LLM Reasoning
+                'llm_reasoning': rec.get('reasoning', ''),
+                # SHAP factors as JSON
+                'shap_factors': json.dumps(rec.get('key_factors', [])),
+                # Member profile
+                'age': int(member['profile']['age']),
+                'risk_score': float(member['profile']['risk_score']),
+                'chronic_condition_count': int(member['profile']['chronic_condition_count']),
+                'total_claims': int(member['profile']['total_claims']),
+                'total_engagements': int(member['profile']['total_engagements']),
+                'has_diabetes': bool(member['profile']['has_diabetes']),
+                'has_cardiovascular': bool(member['profile']['has_cardiovascular']),
+                'has_respiratory': bool(member['profile']['has_respiratory']),
+                'has_mental_health': bool(member['profile']['has_mental_health']),
+                'is_complex_patient': bool(member['profile']['is_complex_patient']),
+                # Additional features from features_df
+                'tenure_months': int(member_features.get('tenure_months', 0)),
+                'is_senior': int(member_features.get('is_senior', 0)),
+                'high_risk_flag': int(member_features.get('high_risk_flag', 0)),
+                'avg_utilization_rate': float(member_features.get('avg_utilization_rate', 0)),
+                'avg_response_rate': float(member_features.get('avg_response_rate', 0)),
+                # Metadata
+                'generated_at': datetime.now().isoformat(),
+                'model_version': UC_MODEL_VERSION if USE_REGISTRY_MODEL else 'demo'
+            })
+    consolidated_df = pd.DataFrame(records)
+else:
+    # Fallback: use explanations_df without LLM reasoning
+    consolidated_df = explanations_df.copy()
+    consolidated_df['shap_factors'] = consolidated_df['top_features'].apply(lambda x: json.dumps(x))
+    consolidated_df = consolidated_df.drop(columns=['top_features'])
+    consolidated_df['llm_reasoning'] = ''
+    consolidated_df['generated_at'] = datetime.now().isoformat()
+    consolidated_df['model_version'] = UC_MODEL_VERSION if USE_REGISTRY_MODEL else 'demo'
+
+print(f"✅ Consolidated table: {len(consolidated_df):,} rows, {len(consolidated_df.columns)} columns")
+consolidated_df.head()
+
+# COMMAND ----------
+
+# Save consolidated output to Delta table
+CONSOLIDATED_TABLE = f"{CATALOG_NAME}.{SCHEMA_NAME}.member_offer_recommendations_with_reasoning"
+
+consolidated_spark = spark.createDataFrame(consolidated_df)
+consolidated_spark.write \
+    .mode("overwrite") \
+    .option("overwriteSchema", "true") \
+    .saveAsTable(CONSOLIDATED_TABLE)
+
+print(f"✅ Saved to Delta table: {CONSOLIDATED_TABLE}")
+print(f"   Rows: {len(consolidated_df):,}")
+print(f"   Members: {consolidated_df['member_id'].nunique()}")
+print(f"   Offers: {consolidated_df['offer_id'].nunique()}")

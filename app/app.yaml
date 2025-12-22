@@ -1,0 +1,5 @@
+command: ["python", "app.py"]
+env:
+  # SQL Warehouse ID for query execution (get from SQL Warehouse settings)
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: ""  # Set this to your SQL warehouse ID (not the HTTP path, just the ID)

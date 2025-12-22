@@ -15,11 +15,11 @@ setup(
     name="healthcare-offer-prioritization",
     version="1.0.0",
     author="Healthcare Analytics Team",
-    author_email="analytics@example.com",
+    author_email="bhavik.bhatt@databricks.com",
     description="ML-powered healthcare offer prioritization for insurance members",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/example/healthcare-offer-prioritization",
+    url="https://github.com/bhavikbhatt/Healthcare-Offer-Prioritization",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",

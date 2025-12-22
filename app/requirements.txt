@@ -1,0 +1,3 @@
+dash>=2.14.0
+databricks-sdk>=0.18.0
+pandas>=1.5.0
