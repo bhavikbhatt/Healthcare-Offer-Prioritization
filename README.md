@@ -17,8 +17,9 @@ An end-to-end machine learning system built on Databricks that personalizes heal
 9. [Getting Started](#getting-started)
 10. [Running the Notebooks](#running-the-notebooks)
 11. [LLM-Powered Explanations](#llm-powered-explanations)
-12. [Configuration](#configuration)
-13. [Troubleshooting](#troubleshooting)
+12. [Interactive Web Application](#interactive-web-application)
+13. [Configuration](#configuration)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -43,6 +44,8 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 | 🤖 **LLM Reasoning** | Natural language explanations generated for each recommendation |
 | 📦 **MLflow Integration** | Full experiment tracking, model registry, and versioning |
 | ⚡ **Batch & Real-time** | Supports both batch scoring and real-time inference |
+| 🌐 **Interactive Web App** | Dash-based UI to browse members, view recommendations, and provide feedback |
+| 👍 **Feedback Collection** | Approve/reject offers and submit comments for model improvement |
 
 ---
 
@@ -126,11 +129,32 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 │                              │                                         │
 │                              ▼                                         │
 │  ┌──────────────────────────────────────────────────────────┐         │
-│  │                    OUTPUT                                 │         │
+│  │                    DELTA TABLE                            │         │
+│  │  member_offer_recommendations_with_reasoning              │         │
 │  │  • Personalized offer rankings per member                │         │
 │  │  • Priority scores (0-100)                               │         │
 │  │  • Feature importance per recommendation                 │         │
 │  │  • Natural language reasoning                            │         │
+│  └─────────────────────────┬────────────────────────────────┘         │
+│                              │                                         │
+│                              ▼                                         │
+│  ┌──────────────────────────────────────────────────────────┐         │
+│  │                 DATABRICKS APP (Dash)                     │         │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │         │
+│  │  │   Member    │  │   Offer     │  │  Feedback   │      │         │
+│  │  │   Search    │  │   Cards     │  │  Buttons    │      │         │
+│  │  │             │  │ • Score     │  │ ✓ Approve   │      │         │
+│  │  │  Dropdown   │  │ • Reasoning │  │ ✗ Reject    │      │         │
+│  │  │  with 500+  │  │ • SHAP      │  │ 💬 Comments │      │         │
+│  │  │  members    │  │   factors   │  │             │      │         │
+│  │  └─────────────┘  └─────────────┘  └──────┬──────┘      │         │
+│  └───────────────────────────────────────────┼──────────────┘         │
+│                                               │                        │
+│                                               ▼                        │
+│  ┌──────────────────────────────────────────────────────────┐         │
+│  │              FEEDBACK TABLE (Delta)                       │         │
+│  │  offer_feedback: member_id, offer_id, feedback,          │         │
+│  │                  feedback_text, feedback_time            │         │
 │  └──────────────────────────────────────────────────────────┘         │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -142,6 +166,11 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 
 ```
 offer_prioritization/
+│
+├── 📁 app/
+│   ├── app.py                    # Dash web application for member recommendations
+│   ├── app.yaml                  # Databricks App configuration
+│   └── requirements.txt          # App-specific Python dependencies
 │
 ├── 📁 config/
 │   ├── __init__.py
@@ -185,6 +214,8 @@ offer_prioritization/
 | **RuleBasedScorer** | `models/offer_model.py` | Generates training labels from business rules |
 | **OfferPrioritizationModel** | `models/offer_model.py` | LightGBM multi-output wrapper |
 | **OfferRecommendationEngine** | `notebooks/04_model_inference.py` | Generates recommendations with filters |
+| **Dash Web App** | `app/app.py` | Interactive UI for browsing and reviewing recommendations |
+| **Feedback System** | `app/app.py` | Collects user feedback (approve/reject/comments) |
 
 ---
 
@@ -515,6 +546,129 @@ LLM_ENDPOINT_NAME = "your-custom-endpoint"
 
 ---
 
+## Interactive Web Application
+
+The project includes a **Dash-based web application** deployed as a Databricks App that provides a user-friendly interface for exploring recommendations and collecting feedback.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔍 **Member Search** | Searchable dropdown to find members from 500+ in the database |
+| 👤 **Member Profile** | Displays age, risk score, chronic conditions, tenure, and health flags |
+| 🎯 **Top 5 Offers** | Shows ranked recommendations with priority scores |
+| 💬 **LLM Reasoning** | Natural language explanation for why each offer was recommended |
+| 📊 **SHAP Factors** | Key features that influenced each recommendation with direction indicators |
+| ✓ **Approve/Reject** | One-click feedback buttons to rate recommendations |
+| 💭 **Comments** | Text input for detailed feedback on any recommendation |
+
+### Screenshot
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  🏥 Healthcare Offer Prioritization                                │
+├────────────────────────────────────────────────────────────────────┤
+│  Select Member: [M00123 ▼]                                         │
+│  Total members available: 500                                      │
+├────────────────────────────────────────────────────────────────────┤
+│  👤 Member: M00123                                                 │
+│  ┌─────────┬────────────┬────────────┬──────────┬────────────────┐│
+│  │ Age: 58 │ Risk: 72.3 │ Chronic: 2 │ Tenure:48│ Claims: 23     ││
+│  └─────────┴────────────┴────────────┴──────────┴────────────────┘│
+│  Conditions: [Diabetes ✓] [Cardiovascular ✗] [Complex Patient ✓]  │
+├────────────────────────────────────────────────────────────────────┤
+│  🎯 Top 5 Recommended Offers                                       │
+│  ┌────────────────────────────────────────────────────────────────┐│
+│  │ #1 Diabetes Management Program              Score: 87.5        ││
+│  │                                                                 ││
+│  │ 💬 Why This Offer?                                             ││
+│  │ Given your diabetes diagnosis and elevated risk indicators,    ││
+│  │ this program offers personalized coaching and medication...    ││
+│  │                                                                 ││
+│  │ 📊 Key Factors                                                  ││
+│  │ • Has Diabetes         Value: 1.0    ↑ 0.234                   ││
+│  │ • Risk Score           Value: 72.3   ↑ 0.156                   ││
+│  │ • Pharmacy Utilization Value: 0.45   ↑ 0.089                   ││
+│  │                                                                 ││
+│  │ [✓ Approve] [✗ Reject]                                         ││
+│  │                                                                 ││
+│  │ 💭 Additional Comments                                          ││
+│  │ ┌────────────────────────────────────────────────────────────┐ ││
+│  │ │ Share your thoughts on this recommendation...              │ ││
+│  │ └────────────────────────────────────────────────────────────┘ ││
+│  │ [📤 Submit Comment]                                            ││
+│  └────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Deploying the App
+
+1. **Navigate to Databricks Apps** in your workspace
+
+2. **Create a new app** pointing to the `app/` folder
+
+3. **Configure environment variables** in `app.yaml`:
+   ```yaml
+   command:
+     - python
+     - app.py
+   env:
+     - name: DATABRICKS_WAREHOUSE_ID
+       value: "your-sql-warehouse-id"
+   ```
+
+4. **Grant permissions** to the App's service principal:
+   ```sql
+   -- Grant access to recommendations table
+   GRANT SELECT ON TABLE demos.offer_prioritization.member_offer_recommendations_with_reasoning 
+   TO `<app-service-principal>`;
+   
+   -- Grant ability to write feedback
+   GRANT CREATE TABLE ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
+   GRANT MODIFY ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
+   ```
+
+5. **Deploy** and access via the provided URL
+
+### Feedback Data Schema
+
+The app automatically creates a feedback table when users submit their first feedback:
+
+```sql
+CREATE TABLE demos.offer_prioritization.offer_feedback (
+    member_id STRING,        -- Member who received the recommendation
+    offer_id STRING,         -- Offer that was recommended
+    feedback STRING,         -- 'approved', 'rejected', or 'comment'
+    feedback_text STRING,    -- Optional text comment
+    feedback_time TIMESTAMP  -- When feedback was submitted
+);
+```
+
+### Using Feedback for Model Improvement
+
+The collected feedback can be used to:
+
+1. **Retrain the model** with user preferences as additional signal
+2. **Identify poor recommendations** that are consistently rejected
+3. **Discover patterns** in why certain offers resonate with members
+4. **A/B test** different recommendation strategies
+
+```python
+# Query feedback for analysis
+feedback_df = spark.sql("""
+    SELECT 
+        offer_id,
+        COUNT(*) as total_feedback,
+        SUM(CASE WHEN feedback = 'approved' THEN 1 ELSE 0 END) as approvals,
+        SUM(CASE WHEN feedback = 'rejected' THEN 1 ELSE 0 END) as rejections
+    FROM demos.offer_prioritization.offer_feedback
+    GROUP BY offer_id
+    ORDER BY total_feedback DESC
+""")
+```
+
+---
+
 ## Configuration
 
 ### Main Configuration File: `config/config.py`
@@ -574,6 +728,30 @@ load_model_from_registry(MODEL_NAME, alias="champion")
 - Check endpoint name: `databricks-meta-llama-3-1-70b-instruct`
 - Verify Foundation Model API is enabled in your workspace
 - Check user permissions for serving endpoints
+
+#### 6. App shows "No members found" or empty data
+
+**Cause:** App service principal lacks table permissions
+**Solutions:**
+```sql
+GRANT SELECT ON TABLE demos.offer_prioritization.member_offer_recommendations_with_reasoning 
+TO `<app-service-principal>`;
+```
+
+#### 7. Feedback shows "(not saved)" after approve/reject
+
+**Cause:** App cannot create or write to feedback table
+**Solutions:**
+```sql
+-- Grant permissions to create and write tables
+GRANT CREATE TABLE ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
+GRANT MODIFY ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
+```
+
+#### 8. `ValueError: Unknown format code 'f' for object of type 'str'`
+
+**Cause:** Database returns string values that need numeric formatting
+**Solution:** Already fixed - app uses `safe_float()`, `safe_int()`, `safe_bool()` helpers
 
 ### Getting Help
 
