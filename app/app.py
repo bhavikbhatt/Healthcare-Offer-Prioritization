@@ -169,288 +169,502 @@ def initialize_member_list():
 # Initialize Dash app
 app = dash.Dash(__name__)
 
-# Custom CSS styles
+# Custom CSS styles - Business/Marketing Professional Theme
 styles = {
+    # Page wrapper
+    'page_wrapper': {
+        'minHeight': '100vh',
+        'backgroundColor': '#f4f6f9',
+        'fontFamily': '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    },
+    # Top navigation bar
+    'navbar': {
+        'backgroundColor': '#0f172a',
+        'padding': '0 40px',
+        'display': 'flex',
+        'alignItems': 'center',
+        'justifyContent': 'space-between',
+        'height': '64px',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.12)',
+        'position': 'sticky',
+        'top': '0',
+        'zIndex': '100'
+    },
+    'navbar_brand': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'gap': '12px'
+    },
+    'navbar_logo': {
+        'fontSize': '24px'
+    },
+    'navbar_title': {
+        'color': 'white',
+        'fontSize': '18px',
+        'fontWeight': '600',
+        'margin': '0',
+        'letterSpacing': '-0.5px'
+    },
+    'navbar_subtitle': {
+        'color': '#94a3b8',
+        'fontSize': '12px',
+        'margin': '0',
+        'fontWeight': '400'
+    },
+    'navbar_status': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'gap': '8px',
+        'color': '#94a3b8',
+        'fontSize': '13px'
+    },
+    'status_dot': {
+        'width': '8px',
+        'height': '8px',
+        'backgroundColor': '#22c55e',
+        'borderRadius': '50%',
+        'display': 'inline-block'
+    },
+    # Main container
     'container': {
         'maxWidth': '1400px',
         'margin': '0 auto',
-        'padding': '20px 40px',
-        'fontFamily': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        'padding': '32px 40px',
     },
     'header': {
         'textAlign': 'center',
         'marginBottom': '30px',
         'color': '#1a365d'
     },
+    # Search/filter section
     'search_box': {
         'display': 'block',
-        'marginBottom': '30px',
-        'padding': '24px',
-        'backgroundColor': '#f7fafc',
-        'borderRadius': '12px',
-        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+        'marginBottom': '32px',
+        'padding': '24px 28px',
+        'backgroundColor': 'white',
+        'borderRadius': '8px',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.08)',
+        'border': '1px solid #e2e8f0'
+    },
+    'search_header': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'justifyContent': 'space-between',
+        'marginBottom': '16px'
+    },
+    'section_title': {
+        'fontSize': '14px',
+        'fontWeight': '600',
+        'color': '#374151',
+        'textTransform': 'uppercase',
+        'letterSpacing': '0.5px',
+        'margin': '0'
     },
     'input': {
         'flex': '1',
         'padding': '12px 16px',
-        'fontSize': '16px',
-        'border': '2px solid #e2e8f0',
-        'borderRadius': '8px',
+        'fontSize': '15px',
+        'border': '1px solid #d1d5db',
+        'borderRadius': '6px',
         'outline': 'none'
     },
     'button': {
-        'padding': '12px 24px',
-        'backgroundColor': '#3182ce',
+        'padding': '10px 20px',
+        'backgroundColor': '#1e40af',
         'color': 'white',
         'border': 'none',
-        'borderRadius': '8px',
+        'borderRadius': '6px',
         'cursor': 'pointer',
-        'fontSize': '16px',
-        'fontWeight': '600'
+        'fontSize': '14px',
+        'fontWeight': '500'
     },
+    # Member profile card
     'member_card': {
         'backgroundColor': 'white',
-        'borderRadius': '12px',
-        'padding': '24px',
-        'marginBottom': '20px',
-        'boxShadow': '0 4px 6px rgba(0,0,0,0.1)',
+        'borderRadius': '8px',
+        'padding': '24px 28px',
+        'marginBottom': '24px',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.08)',
         'border': '1px solid #e2e8f0'
+    },
+    'member_header': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'justifyContent': 'space-between',
+        'marginBottom': '20px',
+        'paddingBottom': '16px',
+        'borderBottom': '1px solid #e5e7eb'
+    },
+    'member_title': {
+        'fontSize': '18px',
+        'fontWeight': '600',
+        'color': '#111827',
+        'margin': '0'
+    },
+    'member_id_badge': {
+        'backgroundColor': '#f3f4f6',
+        'color': '#6b7280',
+        'padding': '4px 12px',
+        'borderRadius': '4px',
+        'fontSize': '13px',
+        'fontFamily': 'monospace'
     },
     'profile_section': {
         'display': 'grid',
-        'gridTemplateColumns': 'repeat(auto-fit, minmax(150px, 1fr))',
-        'gap': '16px',
-        'marginBottom': '24px',
-        'padding': '16px',
-        'backgroundColor': '#f7fafc',
-        'borderRadius': '8px'
+        'gridTemplateColumns': 'repeat(auto-fit, minmax(140px, 1fr))',
+        'gap': '20px',
+        'marginBottom': '20px',
+        'padding': '20px',
+        'backgroundColor': '#f9fafb',
+        'borderRadius': '6px',
+        'border': '1px solid #f3f4f6'
     },
     'profile_item': {
         'textAlign': 'center'
     },
     'profile_label': {
-        'fontSize': '12px',
-        'color': '#718096',
+        'fontSize': '11px',
+        'color': '#6b7280',
         'textTransform': 'uppercase',
-        'marginBottom': '4px'
+        'letterSpacing': '0.5px',
+        'marginBottom': '6px',
+        'fontWeight': '500'
     },
     'profile_value': {
-        'fontSize': '20px',
+        'fontSize': '22px',
         'fontWeight': '700',
-        'color': '#2d3748'
+        'color': '#111827'
+    },
+    # Offer cards
+    'offers_section_header': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'justifyContent': 'space-between',
+        'marginBottom': '16px'
+    },
+    'offers_title': {
+        'fontSize': '16px',
+        'fontWeight': '600',
+        'color': '#111827',
+        'margin': '0'
     },
     'offer_card': {
-        'backgroundColor': '#ffffff',
-        'border': '1px solid #e2e8f0',
-        'borderRadius': '10px',
-        'padding': '20px',
-        'marginBottom': '16px'
+        'backgroundColor': 'white',
+        'border': '1px solid #e5e7eb',
+        'borderRadius': '8px',
+        'padding': '20px 24px',
+        'marginBottom': '12px',
+        'transition': 'border-color 0.2s ease',
+        'boxShadow': '0 1px 2px rgba(0,0,0,0.04)'
     },
     'offer_header': {
         'display': 'flex',
         'justifyContent': 'space-between',
-        'alignItems': 'center',
+        'alignItems': 'flex-start',
         'marginBottom': '12px'
+    },
+    'offer_title_section': {
+        'display': 'flex',
+        'alignItems': 'center',
+        'gap': '12px'
     },
     'rank_badge': {
-        'backgroundColor': '#3182ce',
+        'backgroundColor': '#1e40af',
         'color': 'white',
-        'padding': '4px 12px',
-        'borderRadius': '20px',
-        'fontSize': '14px',
-        'fontWeight': '600'
+        'padding': '4px 10px',
+        'borderRadius': '4px',
+        'fontSize': '12px',
+        'fontWeight': '600',
+        'minWidth': '28px',
+        'textAlign': 'center'
+    },
+    'offer_name': {
+        'fontSize': '16px',
+        'fontWeight': '600',
+        'color': '#111827',
+        'margin': '0'
+    },
+    'offer_id_text': {
+        'fontSize': '12px',
+        'color': '#9ca3af',
+        'marginTop': '2px'
     },
     'score_badge': {
-        'backgroundColor': '#48bb78',
-        'color': 'white',
-        'padding': '4px 12px',
-        'borderRadius': '20px',
+        'backgroundColor': '#dcfce7',
+        'color': '#166534',
+        'padding': '6px 14px',
+        'borderRadius': '4px',
         'fontSize': '14px',
         'fontWeight': '600'
     },
-    'reasoning_box': {
-        'backgroundColor': '#f0fff4',
-        'border': '1px solid #9ae6b4',
-        'borderRadius': '8px',
-        'padding': '16px',
-        'marginTop': '12px',
-        'marginBottom': '12px'
+    'score_label': {
+        'fontSize': '10px',
+        'color': '#166534',
+        'textTransform': 'uppercase',
+        'letterSpacing': '0.5px',
+        'display': 'block',
+        'marginBottom': '2px'
     },
+    # Reasoning box
+    'reasoning_box': {
+        'backgroundColor': '#f0fdf4',
+        'border': '1px solid #bbf7d0',
+        'borderLeft': '3px solid #22c55e',
+        'borderRadius': '4px',
+        'padding': '16px 20px',
+        'marginTop': '16px',
+        'marginBottom': '16px'
+    },
+    'reasoning_label': {
+        'fontSize': '11px',
+        'fontWeight': '600',
+        'color': '#166534',
+        'textTransform': 'uppercase',
+        'letterSpacing': '0.5px',
+        'marginBottom': '8px'
+    },
+    'reasoning_text': {
+        'margin': '0',
+        'lineHeight': '1.6',
+        'color': '#374151',
+        'fontSize': '14px'
+    },
+    # Explain/Factors section
     'shap_box': {
-        'backgroundColor': '#f8fafc',
-        'border': '1px solid #e2e8f0',
-        'borderRadius': '8px',
-        'padding': '20px',
-        'marginTop': '12px'
+        'backgroundColor': '#fafafa',
+        'border': '1px solid #e5e7eb',
+        'borderRadius': '6px',
+        'padding': '20px 24px',
+        'marginTop': '16px'
+    },
+    'shap_header': {
+        'fontSize': '13px',
+        'fontWeight': '600',
+        'color': '#374151',
+        'marginBottom': '16px',
+        'display': 'flex',
+        'alignItems': 'center',
+        'gap': '8px'
     },
     'shap_item': {
         'display': 'flex',
         'alignItems': 'flex-start',
-        'padding': '12px 0',
-        'borderBottom': '1px solid #edf2f7',
-        'gap': '12px'
+        'padding': '14px 0',
+        'borderBottom': '1px solid #f3f4f6',
+        'gap': '14px'
     },
     'shap_item_icon': {
-        'fontSize': '20px',
+        'fontSize': '18px',
         'lineHeight': '1',
-        'marginTop': '2px'
+        'marginTop': '2px',
+        'width': '24px',
+        'textAlign': 'center'
     },
     'shap_item_content': {
         'flex': '1'
     },
     'shap_item_title': {
         'fontWeight': '600',
-        'color': '#2d3748',
+        'color': '#1f2937',
         'marginBottom': '4px',
-        'fontSize': '15px'
+        'fontSize': '14px',
+        'display': 'flex',
+        'alignItems': 'center',
+        'flexWrap': 'wrap',
+        'gap': '8px'
     },
     'shap_item_description': {
-        'color': '#718096',
-        'fontSize': '14px',
+        'color': '#6b7280',
+        'fontSize': '13px',
         'lineHeight': '1.5'
     },
     'explain_button': {
-        'padding': '10px 20px',
-        'backgroundColor': '#edf2f7',
-        'color': '#4a5568',
-        'border': '1px solid #e2e8f0',
-        'borderRadius': '8px',
+        'padding': '8px 16px',
+        'backgroundColor': 'white',
+        'color': '#374151',
+        'border': '1px solid #d1d5db',
+        'borderRadius': '6px',
         'cursor': 'pointer',
-        'fontSize': '14px',
-        'fontWeight': '600',
-        'display': 'flex',
+        'fontSize': '13px',
+        'fontWeight': '500',
+        'display': 'inline-flex',
         'alignItems': 'center',
-        'gap': '8px',
+        'gap': '6px',
         'marginTop': '12px',
-        'transition': 'all 0.2s ease'
+        'transition': 'all 0.15s ease'
     },
     'explain_button_active': {
-        'padding': '10px 20px',
-        'backgroundColor': '#3182ce',
+        'padding': '8px 16px',
+        'backgroundColor': '#1e40af',
         'color': 'white',
-        'border': '1px solid #3182ce',
-        'borderRadius': '8px',
+        'border': '1px solid #1e40af',
+        'borderRadius': '6px',
         'cursor': 'pointer',
-        'fontSize': '14px',
-        'fontWeight': '600',
-        'display': 'flex',
+        'fontSize': '13px',
+        'fontWeight': '500',
+        'display': 'inline-flex',
         'alignItems': 'center',
-        'gap': '8px',
+        'gap': '6px',
         'marginTop': '12px'
     },
     'impact_badge_positive': {
         'display': 'inline-block',
-        'backgroundColor': '#c6f6d5',
-        'color': '#22543d',
+        'backgroundColor': '#dcfce7',
+        'color': '#166534',
         'padding': '2px 8px',
-        'borderRadius': '12px',
-        'fontSize': '12px',
-        'fontWeight': '600',
-        'marginLeft': '8px'
+        'borderRadius': '3px',
+        'fontSize': '11px',
+        'fontWeight': '500'
     },
     'impact_badge_negative': {
         'display': 'inline-block',
-        'backgroundColor': '#fed7d7',
-        'color': '#742a2a',
+        'backgroundColor': '#fef2f2',
+        'color': '#991b1b',
         'padding': '2px 8px',
-        'borderRadius': '12px',
-        'fontSize': '12px',
-        'fontWeight': '600',
-        'marginLeft': '8px'
+        'borderRadius': '3px',
+        'fontSize': '11px',
+        'fontWeight': '500'
     },
     'condition_badge_true': {
-        'backgroundColor': '#fed7d7',
-        'color': '#c53030',
-        'padding': '2px 8px',
+        'backgroundColor': '#fef2f2',
+        'color': '#991b1b',
+        'padding': '3px 10px',
         'borderRadius': '4px',
         'fontSize': '12px',
-        'marginRight': '8px'
+        'marginRight': '8px',
+        'fontWeight': '500'
     },
     'condition_badge_false': {
-        'backgroundColor': '#c6f6d5',
-        'color': '#276749',
-        'padding': '2px 8px',
+        'backgroundColor': '#f0fdf4',
+        'color': '#166534',
+        'padding': '3px 10px',
         'borderRadius': '4px',
         'fontSize': '12px',
-        'marginRight': '8px'
+        'marginRight': '8px',
+        'fontWeight': '500'
+    },
+    # Feedback section
+    'feedback_section': {
+        'marginTop': '20px',
+        'paddingTop': '20px',
+        'borderTop': '1px solid #e5e7eb'
+    },
+    'feedback_label': {
+        'fontSize': '12px',
+        'fontWeight': '600',
+        'color': '#6b7280',
+        'textTransform': 'uppercase',
+        'letterSpacing': '0.5px',
+        'marginBottom': '12px'
     },
     'feedback_container': {
         'display': 'flex',
-        'gap': '12px',
-        'marginTop': '16px',
-        'paddingTop': '16px',
-        'borderTop': '1px solid #e2e8f0'
+        'gap': '10px',
+        'alignItems': 'center',
+        'flexWrap': 'wrap'
     },
     'approve_button': {
-        'padding': '8px 20px',
-        'backgroundColor': '#48bb78',
+        'padding': '8px 16px',
+        'backgroundColor': '#16a34a',
         'color': 'white',
         'border': 'none',
-        'borderRadius': '6px',
+        'borderRadius': '5px',
         'cursor': 'pointer',
-        'fontSize': '14px',
-        'fontWeight': '600',
-        'display': 'flex',
+        'fontSize': '13px',
+        'fontWeight': '500',
+        'display': 'inline-flex',
         'alignItems': 'center',
-        'gap': '6px'
+        'gap': '6px',
+        'transition': 'background-color 0.15s ease'
     },
     'reject_button': {
-        'padding': '8px 20px',
-        'backgroundColor': '#fc8181',
+        'padding': '8px 16px',
+        'backgroundColor': '#dc2626',
         'color': 'white',
         'border': 'none',
-        'borderRadius': '6px',
+        'borderRadius': '5px',
         'cursor': 'pointer',
-        'fontSize': '14px',
+        'fontSize': '13px',
+        'fontWeight': '500',
+        'display': 'inline-flex',
+        'alignItems': 'center',
+        'gap': '6px',
+        'transition': 'background-color 0.15s ease'
+    },
+    'feedback_approved': {
+        'padding': '8px 14px',
+        'backgroundColor': '#dcfce7',
+        'color': '#166534',
+        'borderRadius': '5px',
+        'fontSize': '13px',
         'fontWeight': '600',
-        'display': 'flex',
+        'display': 'inline-flex',
         'alignItems': 'center',
         'gap': '6px'
     },
-    'feedback_approved': {
-        'padding': '8px 16px',
-        'backgroundColor': '#c6f6d5',
-        'color': '#276749',
-        'borderRadius': '6px',
-        'fontSize': '14px',
-        'fontWeight': '600'
-    },
     'feedback_rejected': {
-        'padding': '8px 16px',
-        'backgroundColor': '#fed7d7',
-        'color': '#c53030',
+        'padding': '8px 14px',
+        'backgroundColor': '#fef2f2',
+        'color': '#991b1b',
+        'borderRadius': '5px',
+        'fontSize': '13px',
+        'fontWeight': '600',
+        'display': 'inline-flex',
+        'alignItems': 'center',
+        'gap': '6px'
+    },
+    # Comment section
+    'comment_section': {
+        'marginTop': '16px',
+        'padding': '16px',
+        'backgroundColor': '#f9fafb',
         'borderRadius': '6px',
-        'fontSize': '14px',
-        'fontWeight': '600'
+        'border': '1px solid #f3f4f6'
     },
     'feedback_textarea': {
         'width': '100%',
-        'minHeight': '60px',
-        'padding': '10px',
-        'border': '1px solid #e2e8f0',
-        'borderRadius': '6px',
-        'fontSize': '14px',
+        'minHeight': '70px',
+        'padding': '12px',
+        'border': '1px solid #d1d5db',
+        'borderRadius': '5px',
+        'fontSize': '13px',
         'resize': 'vertical',
         'marginBottom': '12px',
-        'fontFamily': 'inherit'
+        'fontFamily': 'inherit',
+        'backgroundColor': 'white'
     },
     'submit_feedback_button': {
         'padding': '8px 16px',
-        'backgroundColor': '#3182ce',
+        'backgroundColor': '#1e40af',
         'color': 'white',
         'border': 'none',
-        'borderRadius': '6px',
+        'borderRadius': '5px',
         'cursor': 'pointer',
-        'fontSize': '14px',
-        'fontWeight': '600'
+        'fontSize': '13px',
+        'fontWeight': '500'
     },
     'feedback_submitted': {
-        'padding': '8px 16px',
-        'backgroundColor': '#bee3f8',
-        'color': '#2b6cb0',
-        'borderRadius': '6px',
-        'fontSize': '14px',
-        'fontWeight': '600'
+        'padding': '8px 14px',
+        'backgroundColor': '#dbeafe',
+        'color': '#1e40af',
+        'borderRadius': '5px',
+        'fontSize': '13px',
+        'fontWeight': '500'
+    },
+    # Empty state
+    'empty_state': {
+        'textAlign': 'center',
+        'padding': '60px 40px',
+        'color': '#6b7280'
+    },
+    'empty_state_icon': {
+        'fontSize': '48px',
+        'marginBottom': '16px',
+        'opacity': '0.5'
+    },
+    'empty_state_text': {
+        'fontSize': '15px',
+        'margin': '0'
     }
 }
 
@@ -459,37 +673,55 @@ initialize_member_list()
 
 # App layout
 app.layout = html.Div([
-    # Header
+    # Top Navigation Bar
     html.Div([
-        html.H1("🏥 Healthcare Offer Recommendations", style=styles['header']),
-        html.P("Select a member to view their personalized offer recommendations with AI-generated explanations.",
-               style={'textAlign': 'center', 'color': '#718096', 'marginBottom': '30px'})
-    ]),
+        # Brand/Logo section
+        html.Div([
+            html.Span("◈", style=styles['navbar_logo']),
+            html.Div([
+                html.H1("Offer Management Console", style=styles['navbar_title']),
+                html.P("Healthcare Member Recommendations", style=styles['navbar_subtitle'])
+            ])
+        ], style=styles['navbar_brand']),
+        
+        # Status indicator
+        html.Div([
+            html.Span(style=styles['status_dot']),
+            html.Span(f"{len(MEMBER_LIST):,} members loaded")
+        ], style=styles['navbar_status'])
+    ], style=styles['navbar']),
     
-    # Member Selection Dropdown
+    # Main Content Container
     html.Div([
-        html.Label("Select Member:", style={'fontWeight': '600', 'marginBottom': '8px', 'display': 'block'}),
-        dcc.Dropdown(
-            id='member-dropdown',
-            options=[{'label': member_id, 'value': member_id} for member_id in MEMBER_LIST],
-            placeholder='Search or select a member...',
-            searchable=True,
-            clearable=True,
-            style={'fontSize': '16px', 'width': '100%', 'minWidth': '400px'}
+        # Member Selection Section
+        html.Div([
+            html.Div([
+                html.H3("Member Lookup", style=styles['section_title']),
+                html.Span(
+                    "Search by ID or browse all members",
+                    style={'fontSize': '13px', 'color': '#9ca3af'}
+                )
+            ], style=styles['search_header']),
+            
+            dcc.Dropdown(
+                id='member-dropdown',
+                options=[{'label': f"{member_id}", 'value': member_id} for member_id in MEMBER_LIST],
+                placeholder='Enter member ID or select from list...',
+                searchable=True,
+                clearable=True,
+                style={'fontSize': '14px'}
+            ),
+        ], style=styles['search_box']),
+        
+        # Recommendations Display Area
+        dcc.Loading(
+            id="loading",
+            type="default",
+            color="#1e40af",
+            children=html.Div(id='recommendations-container')
         ),
-        html.Div(
-            f"Total members available: {len(MEMBER_LIST):,}",
-            style={'marginTop': '8px', 'color': '#718096', 'fontSize': '14px'}
-        )
-    ], style=styles['search_box']),
-    
-    # Member Recommendations Display
-    dcc.Loading(
-        id="loading",
-        type="circle",
-        color="#3182ce",
-        children=html.Div(id='recommendations-container')
-    ),
+        
+    ], style=styles['container']),
     
     # Store for selected member
     dcc.Store(id='selected-member-store'),
@@ -500,7 +732,7 @@ app.layout = html.Div([
     # Hidden div for feedback notifications
     html.Div(id='feedback-notification')
     
-], style=styles['container'])
+], style=styles['page_wrapper'])
 
 @app.callback(
     Output('recommendations-container', 'children'),
@@ -510,44 +742,51 @@ app.layout = html.Div([
 def display_member_recommendations(member_id):
     """Display recommendations for selected member."""
     if not member_id:
-        return html.Div(
-            "👆 Select a member from the dropdown above to view their recommendations.",
-            style={'textAlign': 'center', 'color': '#718096', 'padding': '40px', 'fontStyle': 'italic'}
-        )
+        return html.Div([
+            html.Div("📋", style=styles['empty_state_icon']),
+            html.P("Select a member from the dropdown above to view their personalized offer recommendations.", 
+                   style=styles['empty_state_text'])
+        ], style=styles['empty_state'])
     
     # Fetch recommendations
     recommendations = get_member_recommendations(member_id)
     
     if not recommendations:
-        return html.Div(
-            f"No recommendations found for member {member_id}.",
-            style={'color': '#e53e3e', 'padding': '20px', 'textAlign': 'center'}
-        )
+        return html.Div([
+            html.Div("⚠️", style=styles['empty_state_icon']),
+            html.P(f"No recommendations found for member {member_id}.", style=styles['empty_state_text'])
+        ], style=styles['empty_state'])
     
     # Get member profile from first recommendation
     member = recommendations[0]
     
     # Build member profile card
     profile_section = html.Div([
-        html.H2(f"👤 Member: {member_id}", style={'marginBottom': '16px', 'color': '#2d3748'}),
+        # Header with member ID
+        html.Div([
+            html.H2("Member Profile", style=styles['member_title']),
+            html.Span(member_id, style=styles['member_id_badge'])
+        ], style=styles['member_header']),
+        
+        # Key metrics grid
         html.Div([
             create_profile_item("Age", safe_int(member.get('age'), 'N/A')),
-            create_profile_item("Risk Score", f"{safe_float(member.get('risk_score')):.1f}"),
-            create_profile_item("Chronic Conditions", safe_int(member.get('chronic_condition_count'))),
-            create_profile_item("Tenure (months)", safe_int(member.get('tenure_months'), 'N/A')),
-            create_profile_item("Total Claims", safe_int(member.get('total_claims'), 'N/A')),
+            create_profile_item("Risk Score", f"{safe_float(member.get('risk_score')):.0f}"),
+            create_profile_item("Conditions", safe_int(member.get('chronic_condition_count'))),
+            create_profile_item("Tenure", f"{safe_int(member.get('tenure_months'), 0)} mo"),
+            create_profile_item("Claims", safe_int(member.get('total_claims'), 'N/A')),
             create_profile_item("Engagements", safe_int(member.get('total_engagements'), 'N/A')),
         ], style=styles['profile_section']),
         
-        # Condition flags
+        # Health indicators
         html.Div([
-            html.Span("Conditions: ", style={'fontWeight': '600', 'marginRight': '8px'}),
+            html.Span("Health Indicators: ", style={'fontWeight': '500', 'marginRight': '10px', 'color': '#374151', 'fontSize': '13px'}),
             create_condition_badge("Diabetes", member.get('has_diabetes')),
             create_condition_badge("Cardiovascular", member.get('has_cardiovascular')),
             create_condition_badge("Respiratory", member.get('has_respiratory')),
             create_condition_badge("Mental Health", member.get('has_mental_health')),
-            create_condition_badge("Complex Patient", member.get('is_complex_patient')),
-        ], style={'marginBottom': '20px'})
+            create_condition_badge("Complex Care", member.get('is_complex_patient')),
+        ], style={'display': 'flex', 'alignItems': 'center', 'flexWrap': 'wrap', 'gap': '4px'})
     ], style=styles['member_card'])
     
     # Build offer cards
@@ -557,7 +796,12 @@ def display_member_recommendations(member_id):
     
     return html.Div([
         profile_section,
-        html.H3("🎯 Top 5 Recommended Offers", style={'marginBottom': '16px', 'color': '#2d3748'}),
+        # Offers section header
+        html.Div([
+            html.H3("Recommended Offers", style=styles['offers_title']),
+            html.Span(f"{len(recommendations)} offers ranked by relevance", 
+                     style={'fontSize': '13px', 'color': '#6b7280'})
+        ], style=styles['offers_section_header']),
         html.Div(offer_cards)
     ])
 
@@ -1034,42 +1278,43 @@ def create_offer_card(rec, member_id):
     # Build the explain section (hidden by default)
     explain_section = html.Div([
         html.Div([
-            html.Div("🔍 What Influenced This Recommendation", 
-                    style={'fontWeight': '600', 'marginBottom': '16px', 'color': '#2d3748', 'fontSize': '16px'}),
-            html.P("Based on this member's profile, here's why this offer stands out:",
-                  style={'color': '#718096', 'marginBottom': '16px', 'fontSize': '14px'}),
+            html.Div([
+                html.Span("Key Decision Factors", style=styles['shap_header'])
+            ]),
+            html.P("The following member attributes influenced this recommendation:",
+                  style={'color': '#6b7280', 'marginBottom': '16px', 'fontSize': '13px', 'margin': '0 0 16px 0'}),
             html.Div(shap_items) if shap_items else html.P(
                 "No detailed factor data available for this recommendation.", 
-                style={'color': '#718096', 'fontStyle': 'italic'}
+                style={'color': '#9ca3af', 'fontStyle': 'italic', 'fontSize': '13px'}
             )
         ], style=styles['shap_box'])
     ], id=explain_content_id, style={'display': 'none'}) if shap_factors else None
     
     return html.Div([
-        # Header with rank and score
+        # Header with rank, name, and score
         html.Div([
             html.Div([
-                html.Span(f"#{rec.get('rank', 'N/A')}", style=styles['rank_badge']),
-                html.H4(rec.get('offer_name', 'Unknown Offer'), 
-                       style={'margin': '0 0 0 12px', 'color': '#2d3748'})
-            ], style={'display': 'flex', 'alignItems': 'center'}),
-            html.Span(f"Score: {safe_float(rec.get('priority_score')):.1f}", style=styles['score_badge'])
+                html.Span(f"{rec.get('rank', '-')}", style=styles['rank_badge']),
+                html.Div([
+                    html.H4(rec.get('offer_name', 'Unknown Offer'), style=styles['offer_name']),
+                    html.Div(f"ID: {offer_id}", style=styles['offer_id_text'])
+                ], style={'marginLeft': '14px'})
+            ], style=styles['offer_title_section']),
+            html.Div([
+                html.Span("RELEVANCE", style=styles['score_label']),
+                html.Span(f"{safe_float(rec.get('priority_score')):.0f}", style={'fontSize': '18px', 'fontWeight': '700'})
+            ], style=styles['score_badge'])
         ], style=styles['offer_header']),
         
-        # Offer ID
-        html.Div(f"Offer ID: {offer_id}", 
-                style={'color': '#718096', 'fontSize': '14px', 'marginBottom': '12px'}),
-        
-        # LLM Reasoning
+        # AI Recommendation Insight
         html.Div([
-            html.Div("💬 Why This Offer?", style={'fontWeight': '600', 'marginBottom': '8px', 'color': '#276749'}),
-            html.P(rec.get('llm_reasoning', 'No reasoning available.'), 
-                  style={'margin': '0', 'lineHeight': '1.6', 'color': '#2d3748'})
+            html.Div("AI RECOMMENDATION INSIGHT", style=styles['reasoning_label']),
+            html.P(rec.get('llm_reasoning', 'No reasoning available.'), style=styles['reasoning_text'])
         ], style=styles['reasoning_box']) if rec.get('llm_reasoning') else None,
         
         # Explain Button (only if we have SHAP factors)
         html.Button(
-            ["🔍 Explain Key Factors"],
+            ["View Decision Factors"],
             id=explain_btn_id,
             n_clicks=0,
             style=styles['explain_button']
@@ -1078,8 +1323,9 @@ def create_offer_card(rec, member_id):
         # Collapsible Explain Section
         explain_section,
         
-        # Feedback buttons
+        # Feedback section
         html.Div([
+            html.Div("REVIEW THIS RECOMMENDATION", style=styles['feedback_label']),
             html.Div([
                 html.Button(
                     ["✓ Approve"],
@@ -1093,28 +1339,28 @@ def create_offer_card(rec, member_id):
                     n_clicks=0,
                     style=styles['reject_button']
                 ),
-            ], style={'display': 'flex', 'gap': '12px'}),
-            html.Div(id=feedback_status_id, style={'marginLeft': 'auto'})
-        ], style=styles['feedback_container']),
+                html.Div(id=feedback_status_id)
+            ], style=styles['feedback_container']),
+        ], style=styles['feedback_section']),
         
-        # Text feedback section
+        # Comment section
         html.Div([
-            html.Div("💭 Additional Comments", style={'fontWeight': '600', 'marginBottom': '8px', 'color': '#4a5568'}),
+            html.Div("Add a note (optional)", style={'fontSize': '12px', 'color': '#6b7280', 'marginBottom': '8px'}),
             dcc.Textarea(
                 id=feedback_text_id,
-                placeholder="Share your thoughts on this recommendation (optional)...",
+                placeholder="Share feedback about this recommendation...",
                 style=styles['feedback_textarea']
             ),
             html.Div([
                 html.Button(
-                    "📤 Submit Comment",
+                    "Submit Note",
                     id=submit_text_id,
                     n_clicks=0,
                     style=styles['submit_feedback_button']
                 ),
                 html.Div(id=text_status_id, style={'marginLeft': '12px', 'display': 'flex', 'alignItems': 'center'})
             ], style={'display': 'flex', 'alignItems': 'center'})
-        ], style={'marginTop': '16px', 'paddingTop': '16px', 'borderTop': '1px dashed #e2e8f0'})
+        ], style=styles['comment_section'])
         
     ], style=styles['offer_card'])
 
@@ -1136,13 +1382,13 @@ def toggle_explain_section(n_clicks):
     if is_open:
         return (
             {'display': 'block'},  # Show content
-            ["🔍 Hide Key Factors"],  # Update button text
+            ["Hide Decision Factors"],  # Update button text
             styles['explain_button_active']  # Active button style
         )
     else:
         return (
             {'display': 'none'},  # Hide content
-            ["🔍 Explain Key Factors"],  # Reset button text
+            ["View Decision Factors"],  # Reset button text
             styles['explain_button']  # Default button style
         )
 
@@ -1240,3 +1486,4 @@ def handle_text_feedback(n_clicks, feedback_text):
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8050)
+
