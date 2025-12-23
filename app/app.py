@@ -1,53 +1,305 @@
+"""
+Offer Management Console - Lakebase Version
+
+This app uses Databricks Lakebase (PostgreSQL-compatible) for fast data retrieval.
+Uses the Databricks App's service principal (DATABRICKS_CLIENT_ID/SECRET) to 
+generate OAuth tokens for Lakebase authentication.
+
+Required App Resource:
+- Type: Database
+- Database: demos
+- Instance: offer-prioritization
+"""
+
 import dash
 from dash import html, dcc, Input, Output, State, callback_context
 import os
 import json
-from databricks.sdk import WorkspaceClient
+import time
+import urllib.request
+import urllib.parse
 
-# Configuration - UPDATE THESE TO MATCH YOUR TABLE
+# PostgreSQL driver for Lakebase connection
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# Configuration
 CATALOG = "demos"
 SCHEMA = "offer_prioritization"
-TABLE = "member_offer_recommendations_with_reasoning"
-FULL_TABLE_NAME = f"{CATALOG}.{SCHEMA}.{TABLE}"
+LAKEBASE_TABLE = "lakebase_offers"
 
-# Initialize workspace client (auto-configured in Databricks Apps)
-workspace_client = WorkspaceClient()
+# Delta table for feedback (NOT in Lakebase - written via Databricks SQL API)
+FEEDBACK_TABLE_DELTA = f"{CATALOG}.{SCHEMA}.offer_feedback"
 
-def execute_query(query: str, params: tuple = None):
+# Databricks App service principal credentials (auto-injected)
+DATABRICKS_CLIENT_ID = os.getenv("DATABRICKS_CLIENT_ID", "")
+DATABRICKS_CLIENT_SECRET = os.getenv("DATABRICKS_CLIENT_SECRET", "")
+DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")  # e.g., fe-vm-vdm-classic-h4yue1.cloud.databricks.com
+DATABRICKS_WAREHOUSE_ID = os.getenv("DATABRICKS_WAREHOUSE_ID", "")
+
+# PostgreSQL/Lakebase connection settings
+PG_HOST = os.getenv("PGHOST", "")
+PG_PORT = os.getenv("PGPORT", "5432")
+PG_DATABASE = os.getenv("PGDATABASE", CATALOG)
+PG_USER = os.getenv("PGUSER", "")  # Service principal ID (will use CLIENT_ID if not set)
+PG_SSLMODE = os.getenv("PGSSLMODE", "require")
+
+# Full table path in Lakebase: schema.table (within the PGDATABASE)
+FULL_TABLE_NAME = f"{SCHEMA}.{LAKEBASE_TABLE}"
+
+# Token cache
+_token_cache = {
+    "token": None,
+    "expires_at": 0
+}
+
+
+def get_workspace_host():
+    """Extract the workspace host from DATABRICKS_HOST."""
+    host = DATABRICKS_HOST
+    # Remove any protocol prefix
+    if host.startswith("https://"):
+        host = host[8:]
+    if host.startswith("http://"):
+        host = host[7:]
+    # Handle fe-vm-vdm-classic-xxx.cloud.databricks.com format
+    # Extract just the workspace part (e.g., h4yue1.cloud.databricks.com)
+    if "cloud.databricks.com" in host:
+        parts = host.split(".")
+        # Find the part before 'cloud'
+        for i, part in enumerate(parts):
+            if part == "cloud":
+                # Take from here to end
+                return ".".join(parts[i-1:])
+    return host
+
+
+def get_oauth_token():
     """
-    Execute a SQL query using Databricks SDK Statement Execution API.
-    This works automatically in Databricks Apps without manual connection setup.
+    Get an OAuth token for the service principal using client credentials flow.
+    Caches the token and refreshes when expired.
+    """
+    global _token_cache
+    
+    # Check if we have a valid cached token (with 60s buffer)
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+        return _token_cache["token"]
+    
+    if not DATABRICKS_CLIENT_ID or not DATABRICKS_CLIENT_SECRET:
+        print("⚠️ DATABRICKS_CLIENT_ID or DATABRICKS_CLIENT_SECRET not set")
+        # Fall back to PGPASSWORD or LAKEBASE_PASSWORD if available
+        fallback = os.getenv("PGPASSWORD", "") or os.getenv("LAKEBASE_PASSWORD", "")
+        if fallback:
+            print("📌 Using fallback password from environment")
+            return fallback
+        raise Exception(
+            "No authentication credentials available. "
+            "Make sure DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are set."
+        )
+    
+    # Get workspace host for token endpoint
+    workspace_host = get_workspace_host()
+    if not workspace_host:
+        raise Exception("Cannot determine workspace host from DATABRICKS_HOST")
+    
+    token_url = f"https://{workspace_host}/oidc/v1/token"
+    
+    print(f"🔑 Requesting OAuth token from {token_url}")
+    
+    # Prepare the request
+    data = urllib.parse.urlencode({
+        "grant_type": "client_credentials",
+        "scope": "all-apis"
+    }).encode("utf-8")
+    
+    # Create request with Basic auth
+    import base64
+    credentials = base64.b64encode(
+        f"{DATABRICKS_CLIENT_ID}:{DATABRICKS_CLIENT_SECRET}".encode()
+    ).decode()
+    
+    req = urllib.request.Request(
+        token_url,
+        data=data,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {credentials}"
+        }
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            result = json.loads(response.read().decode())
+            
+            access_token = result.get("access_token")
+            expires_in = result.get("expires_in", 3600)  # Default 1 hour
+            
+            # Cache the token
+            _token_cache["token"] = access_token
+            _token_cache["expires_at"] = time.time() + expires_in
+            
+            print(f"✅ OAuth token obtained (expires in {expires_in}s)")
+            return access_token
+            
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else ""
+        print(f"❌ OAuth token request failed: {e.code} - {error_body}")
+        raise Exception(f"Failed to get OAuth token: {e.code} - {error_body}")
+    except Exception as e:
+        print(f"❌ OAuth token request error: {e}")
+        raise
+
+
+# Print configuration at startup
+print(f"🔗 Lakebase Connection Configuration:")
+print(f"   Host: {PG_HOST}")
+print(f"   Port: {PG_PORT}")
+print(f"   Database: {PG_DATABASE}")
+print(f"   User: {PG_USER[:30]}..." if PG_USER else "   User: NOT SET")
+print(f"   Table: {FULL_TABLE_NAME}")
+print(f"")
+print(f"🔐 Service Principal Auth:")
+print(f"   DATABRICKS_CLIENT_ID: {'SET' if DATABRICKS_CLIENT_ID else 'NOT SET'}")
+print(f"   DATABRICKS_CLIENT_SECRET: {'SET' if DATABRICKS_CLIENT_SECRET else 'NOT SET'}")
+print(f"   DATABRICKS_HOST: {DATABRICKS_HOST}")
+print(f"   DATABRICKS_WAREHOUSE_ID: {'SET' if DATABRICKS_WAREHOUSE_ID else 'NOT SET'}")
+print(f"")
+print(f"📝 Feedback Delta Table: {FEEDBACK_TABLE_DELTA}")
+
+
+def execute_databricks_sql(sql: str, wait_timeout: str = "30s"):
+    """
+    Execute SQL against Databricks using the SQL Statement Execution API.
+    This is used to write to Delta tables (not Lakebase).
+    
+    Args:
+        sql: The SQL statement to execute
+        wait_timeout: How long to wait for the statement to complete
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    if not DATABRICKS_WAREHOUSE_ID:
+        print("⚠️ DATABRICKS_WAREHOUSE_ID not set - cannot execute Databricks SQL")
+        return False
+    
+    workspace_host = get_workspace_host()
+    if not workspace_host:
+        print("⚠️ Cannot determine workspace host")
+        return False
+    
+    api_url = f"https://{workspace_host}/api/2.0/sql/statements"
+    
+    # Get OAuth token
+    token = get_oauth_token()
+    
+    # Prepare request
+    payload = json.dumps({
+        "warehouse_id": DATABRICKS_WAREHOUSE_ID,
+        "statement": sql,
+        "wait_timeout": wait_timeout
+    }).encode("utf-8")
+    
+    req = urllib.request.Request(
+        api_url,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
+        }
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode())
+            status = result.get("status", {}).get("state", "")
+            
+            if status == "SUCCEEDED":
+                return True
+            elif status == "FAILED":
+                error = result.get("status", {}).get("error", {})
+                print(f"❌ Databricks SQL failed: {error.get('message', 'Unknown error')}")
+                return False
+            else:
+                # Statement is still running or pending
+                print(f"⏳ Databricks SQL status: {status}")
+                return True  # Assume it will complete
+                
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode() if e.fp else ""
+        print(f"❌ Databricks SQL API error: {e.code} - {error_body}")
+        return False
+    except Exception as e:
+        print(f"❌ Databricks SQL error: {e}")
+        return False
+
+
+def get_connection():
+    """
+    Create a connection to Lakebase using the service principal's OAuth token.
+    The token is obtained using DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET.
+    """
+    if not PG_HOST:
+        raise Exception(
+            "PGHOST not configured. "
+            "Make sure your Databricks App has a Database resource linked to your Lakebase instance."
+        )
+    
+    # Use PGUSER if set, otherwise use the service principal client ID
+    user = PG_USER or DATABRICKS_CLIENT_ID
+    if not user:
+        raise Exception(
+            "No user configured. Set PGUSER or DATABRICKS_CLIENT_ID."
+        )
+    
+    # Get OAuth token (cached and auto-refreshed)
+    password = get_oauth_token()
+    
+    print(f"🔌 Connecting to Lakebase as {user[:30]}...")
+    
+    return psycopg2.connect(
+        host=PG_HOST,
+        port=int(PG_PORT),
+        database=PG_DATABASE,
+        user=user,
+        password=password,
+        sslmode=PG_SSLMODE
+    )
+
+
+def execute_query(query: str):
+    """
+    Execute a SQL query against Lakebase.
+    Returns list of dictionaries.
     """
     try:
-        # Use the Statement Execution API via workspace client
-        # This automatically uses the app's credentials
-        response = workspace_client.statement_execution.execute_statement(
-            warehouse_id=os.getenv("DATABRICKS_WAREHOUSE_ID"),
-            catalog=CATALOG,
-            schema=SCHEMA,
-            statement=query,
-            wait_timeout="30s"
-        )
-        
-        if response.result and response.result.data_array:
-            columns = [col.name for col in response.manifest.schema.columns]
-            return [dict(zip(columns, row)) for row in response.result.data_array]
-        return []
+        conn = get_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute(query)
+            results = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in results]
     except Exception as e:
-        print(f"Query error: {e}")
-        # Fallback: try using spark SQL if available
-        try:
-            from pyspark.sql import SparkSession
-            spark = SparkSession.builder.getOrCreate()
-            if params:
-                # Replace ? with actual values for spark
-                for param in params:
-                    query = query.replace("?", f"'{param}'", 1)
-            df = spark.sql(query)
-            return [row.asDict() for row in df.collect()]
-        except Exception as e2:
-            print(f"Spark fallback error: {e2}")
-            return []
+        print(f"❌ Query error: {e}")
+        print(f"   Query: {query[:200]}...")
+        return []
+
+
+def execute_write(query: str):
+    """
+    Execute a write query (INSERT/UPDATE/DELETE) against Lakebase.
+    """
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Write error: {e}")
+        return False
+
 
 def search_members(search_term: str, limit: int = 20):
     """Search for members by member_id."""
@@ -60,6 +312,7 @@ def search_members(search_term: str, limit: int = 20):
     """
     results = execute_query(query)
     return [row['member_id'] for row in results]
+
 
 def get_member_recommendations(member_id: str):
     """Get all recommendations for a specific member."""
@@ -92,6 +345,7 @@ def get_member_recommendations(member_id: str):
     """
     return execute_query(query)
 
+
 def get_all_members():
     """Get all unique member IDs for dropdown."""
     query = f"""
@@ -103,50 +357,58 @@ def get_all_members():
     results = execute_query(query)
     return [row['member_id'] for row in results]
 
+
 FEEDBACK_TABLE_CREATED = False
 
 def ensure_feedback_table():
-    """Create the feedback table if it doesn't exist."""
+    """Create the feedback Delta table if it doesn't exist."""
     global FEEDBACK_TABLE_CREATED
     if FEEDBACK_TABLE_CREATED:
         return True
     
     try:
+        # Create Delta table if it doesn't exist (using Databricks SQL API)
         create_query = f"""
-            CREATE TABLE IF NOT EXISTS {CATALOG}.{SCHEMA}.offer_feedback (
+            CREATE TABLE IF NOT EXISTS {FEEDBACK_TABLE_DELTA} (
                 member_id STRING,
                 offer_id STRING,
                 feedback STRING,
                 feedback_text STRING,
                 feedback_time TIMESTAMP
             )
+            USING DELTA
         """
-        execute_query(create_query)
-        FEEDBACK_TABLE_CREATED = True
-        print(f"✅ Feedback table ready: {CATALOG}.{SCHEMA}.offer_feedback")
-        return True
+        if execute_databricks_sql(create_query):
+            FEEDBACK_TABLE_CREATED = True
+            print(f"✅ Feedback table created: {FEEDBACK_TABLE_DELTA}")
+            return True
+        return False
     except Exception as e:
         print(f"⚠️ Could not create feedback table: {e}")
         return False
 
+
 def save_feedback(member_id: str, offer_id: str, feedback: str, feedback_text: str = None):
-    """Save offer feedback. Logs feedback and saves to database."""
+    """Save offer feedback to Delta table using Databricks SQL API."""
     text_display = f" - Comment: {feedback_text[:50]}..." if feedback_text and len(feedback_text) > 50 else (f" - Comment: {feedback_text}" if feedback_text else "")
     print(f"📝 Feedback received: {member_id} - {offer_id} - {feedback}{text_display}")
     
-    # Ensure table exists
     ensure_feedback_table()
     
     try:
-        # Escape single quotes in text feedback
         safe_text = feedback_text.replace("'", "''") if feedback_text else ""
-        query = f"INSERT INTO {CATALOG}.{SCHEMA}.offer_feedback (member_id, offer_id, feedback, feedback_text, feedback_time) VALUES ('{member_id}', '{offer_id}', '{feedback}', '{safe_text}', current_timestamp())"
-        execute_query(query)
-        print(f"✅ Saved to database: {CATALOG}.{SCHEMA}.offer_feedback")
-        return True
-    except Exception as e:
-        print(f"⚠️ Could not save feedback to DB: {e}")
+        query = f"""
+            INSERT INTO {FEEDBACK_TABLE_DELTA} (member_id, offer_id, feedback, feedback_text, feedback_time) 
+            VALUES ('{member_id}', '{offer_id}', '{feedback}', '{safe_text}', current_timestamp())
+        """
+        if execute_databricks_sql(query):
+            print(f"✅ Saved to Delta table: {FEEDBACK_TABLE_DELTA}")
+            return True
         return False
+    except Exception as e:
+        print(f"⚠️ Could not save feedback to Delta table: {e}")
+        return False
+
 
 # Cache member list on startup
 MEMBER_LIST = []
@@ -156,6 +418,7 @@ def initialize_member_list():
     """Initialize the member list cache."""
     global MEMBER_LIST, INIT_ERROR
     try:
+        print(f"🔄 Loading members from {FULL_TABLE_NAME}...")
         MEMBER_LIST = get_all_members()
         print(f"✅ Loaded {len(MEMBER_LIST)} members into cache")
         if len(MEMBER_LIST) == 0:
@@ -165,6 +428,7 @@ def initialize_member_list():
         INIT_ERROR = f"Failed to load members: {str(e)}"
         print(f"❌ {INIT_ERROR}")
         return []
+
 
 # Initialize Dash app
 app = dash.Dash(__name__)
@@ -680,14 +944,14 @@ app.layout = html.Div([
             html.Span("◈", style=styles['navbar_logo']),
             html.Div([
                 html.H1("Offer Management Console", style=styles['navbar_title']),
-                html.P("Healthcare Member Recommendations", style=styles['navbar_subtitle'])
+                html.P("Powered by Lakebase", style=styles['navbar_subtitle'])
             ])
         ], style=styles['navbar_brand']),
         
         # Status indicator
         html.Div([
             html.Span(style=styles['status_dot']),
-            html.Span(f"{len(MEMBER_LIST):,} members loaded")
+            html.Span(f"{len(MEMBER_LIST):,} members • Lakebase")
         ], style=styles['navbar_status'])
     ], style=styles['navbar']),
     
@@ -733,6 +997,7 @@ app.layout = html.Div([
     html.Div(id='feedback-notification')
     
 ], style=styles['page_wrapper'])
+
 
 @app.callback(
     Output('recommendations-container', 'children'),
@@ -805,6 +1070,7 @@ def display_member_recommendations(member_id):
         html.Div(offer_cards)
     ])
 
+
 def safe_float(value, default=0):
     """Safely convert a value to float."""
     try:
@@ -812,12 +1078,14 @@ def safe_float(value, default=0):
     except (ValueError, TypeError):
         return default
 
+
 def safe_int(value, default=0):
     """Safely convert a value to int."""
     try:
         return int(float(value)) if value is not None else default
     except (ValueError, TypeError):
         return default
+
 
 def safe_bool(value):
     """Safely convert a value to bool."""
@@ -830,6 +1098,7 @@ def safe_bool(value):
     except Exception:
         return False
 
+
 def create_profile_item(label, value):
     """Create a profile stat item."""
     return html.Div([
@@ -837,20 +1106,19 @@ def create_profile_item(label, value):
         html.Div(str(value), style=styles['profile_value'])
     ], style=styles['profile_item'])
 
+
 def create_condition_badge(name, has_condition):
     """Create a condition badge."""
-    # Convert to bool safely (database might return string or int)
     has_condition = safe_bool(has_condition)
     style = styles['condition_badge_true'] if has_condition else styles['condition_badge_false']
     icon = "✓" if has_condition else "✗"
     return html.Span(f"{icon} {name}", style=style)
 
+
 def get_factor_icon(feature_name: str) -> str:
     """Get an appropriate emoji icon for a feature."""
     feature_lower = feature_name.lower()
     
-    # Check more specific patterns first (order matters!)
-    # Engagement channels - check before generic 'engagement'
     if 'phone' in feature_lower or 'call' in feature_lower:
         return '📞'
     elif 'email' in feature_lower:
@@ -861,7 +1129,6 @@ def get_factor_icon(feature_name: str) -> str:
         return '💻'
     elif 'engagement' in feature_lower or 'response' in feature_lower:
         return '📱'
-    # Age - check for exact match to avoid 'engagement' false positive
     elif feature_lower == 'age' or feature_lower.startswith('age_') or feature_lower.endswith('_age'):
         return '🎂'
     elif 'risk' in feature_lower:
@@ -895,14 +1162,12 @@ def get_factor_icon(feature_name: str) -> str:
     else:
         return '📌'
 
+
 def format_feature_name(feature_name: str) -> str:
     """Convert feature name to human-readable format."""
-    # Remove common prefixes/suffixes and clean up
     name = feature_name.replace('_', ' ').replace('has ', '').replace(' flag', '')
     
-    # Specific replacements for clarity (check more specific patterns first)
     replacements = {
-        # Engagement channels (check these first - order matters in dict iteration)
         'phone engagement rate': 'Phone outreach response',
         'call engagement rate': 'Phone outreach response',
         'email engagement rate': 'Email engagement',
@@ -910,9 +1175,7 @@ def format_feature_name(feature_name: str) -> str:
         'portal login count': 'Portal activity',
         'total engagements': 'Engagement with health programs',
         'days since last engagement': 'Time since last interaction',
-        # Response
         'avg response rate': 'Response to outreach',
-        # Claims
         'chronic condition count': 'Number of chronic conditions',
         'total claims count': 'Healthcare claims history',
         'claims last': 'Recent claims activity',
@@ -921,17 +1184,14 @@ def format_feature_name(feature_name: str) -> str:
         'inpatient count': 'Hospital stays',
         'specialist visit count': 'Specialist consultations',
         'preventive visit count': 'Preventive care visits',
-        # Utilization
         'avg utilization rate': 'Benefits utilization level',
         'pharmacy utilization rate': 'Prescription medication usage',
         'medical utilization rate': 'Medical services usage',
         'preventive utilization rate': 'Preventive care usage',
         'mental health utilization rate': 'Mental health services usage',
-        # Cost
         'remaining deductible pct': 'Remaining deductible',
         'remaining oop max pct': 'Out-of-pocket spending room',
         'total member cost': 'Healthcare spending',
-        # Profile
         'risk score': 'Health risk assessment',
         'tenure months': 'Membership duration',
         'is senior': 'Senior member status',
@@ -946,39 +1206,22 @@ def format_feature_name(feature_name: str) -> str:
     
     return name.title()
 
+
 def generate_factor_description(feature_name: str, value, direction: str, member_profile: dict = None) -> str:
-    """
-    Generate a human-readable description of why a factor matters.
-    
-    Args:
-        feature_name: The name of the feature
-        value: The SHAP factor's value (may be encoded/transformed)
-        direction: 'increases' or 'decreases'
-        member_profile: Optional dict with actual member data (age, risk_score, etc.)
-                       Used to get accurate values for display
-    """
+    """Generate a human-readable description of why a factor matters."""
     feature_lower = feature_name.lower()
     is_positive = direction == 'increases'
     
-    # Helper to get actual value from member profile if available
     def get_actual_value(feature_key, default_value):
-        """Get actual value from member profile, falling back to SHAP value."""
         if member_profile:
-            # Try direct match
             if feature_key in member_profile and member_profile[feature_key] is not None:
                 return member_profile[feature_key]
-            # Try with underscores
             key_underscore = feature_key.replace(' ', '_')
             if key_underscore in member_profile and member_profile[key_underscore] is not None:
                 return member_profile[key_underscore]
         return default_value
     
-    # NOTE: Order matters! Check more specific patterns before generic ones.
-    # e.g., "engagement" contains "age", so check engagement first.
-    
-    # Engagement-related factors (check BEFORE 'age' since 'engagement' contains 'age')
     if 'engagement' in feature_lower or 'response' in feature_lower:
-        # Determine the type of engagement
         if 'phone' in feature_lower or 'call' in feature_lower:
             channel = "phone"
             channel_desc = "phone outreach"
@@ -989,44 +1232,23 @@ def generate_factor_description(feature_name: str, value, direction: str, member
             channel = "digital"
             channel_desc = "digital channels"
         elif 'response' in feature_lower:
-            rate = safe_float(value)
-            pct = rate * 100 if rate <= 1 else rate
             if is_positive:
-                return f"Their responsiveness to outreach ({pct:.0f}%) suggests they'll engage with this offer."
+                return "Their responsiveness to outreach suggests they'll engage with this offer."
             else:
-                return f"Their response patterns indicate we may need different messaging approaches."
+                return "Their response patterns indicate we may need different messaging approaches."
         else:
             channel = "program"
             channel_desc = "health programs"
         
-        # Get actual engagement value if available
-        actual_engagements = get_actual_value('total_engagements', value)
-        rate = safe_float(actual_engagements)
-        
-        # Check if it's a rate (0-1) or a count
-        if rate <= 1 and 'rate' in feature_lower:
-            pct = rate * 100
-            if is_positive:
-                return f"Their {channel} engagement shows strong receptivity to {channel_desc}."
-            else:
-                return f"Their {channel} engagement suggests trying different communication channels."
+        if is_positive:
+            return f"Their {channel} engagement shows strong receptivity to {channel_desc}."
         else:
-            count = int(rate) if rate > 1 else None
-            if is_positive:
-                if count:
-                    return f"Their engagement history ({count} interactions) indicates openness to health programs."
-                else:
-                    return f"Their engagement history indicates openness to health programs."
-            else:
-                return f"Their engagement level suggests exploring alternative outreach methods."
+            return f"Their {channel} engagement suggests trying different communication channels."
     
-    # Age - use word boundary check to avoid matching "engagement"
     elif feature_lower == 'age' or feature_lower.startswith('age_') or feature_lower.endswith('_age'):
-        # Get actual age from member profile
         actual_age = get_actual_value('age', value)
         age_val = int(safe_float(actual_age))
         
-        # Sanity check - if age seems wrong, don't show specific number
         if age_val < 18 or age_val > 120:
             if is_positive:
                 return "Their age demographic makes this offer particularly relevant."
@@ -1038,7 +1260,6 @@ def generate_factor_description(feature_name: str, value, direction: str, member
         else:
             return f"At age {age_val}, other offers may be more relevant to their life stage."
     
-    # Risk score
     elif 'risk_score' in feature_lower or 'risk score' in feature_lower:
         actual_risk = get_actual_value('risk_score', value)
         val = safe_float(actual_risk)
@@ -1053,7 +1274,6 @@ def generate_factor_description(feature_name: str, value, direction: str, member
         else:
             return f"Their {level} risk profile suggests other programs may be better suited."
     
-    # Diabetes
     elif 'diabetes' in feature_lower:
         actual_val = get_actual_value('has_diabetes', value)
         has_condition = safe_bool(actual_val) or safe_float(actual_val) > 0
@@ -1064,7 +1284,6 @@ def generate_factor_description(feature_name: str, value, direction: str, member
         else:
             return "No diabetes diagnosis on record."
     
-    # Cardiovascular
     elif 'cardiovascular' in feature_lower or 'heart' in feature_lower:
         actual_val = get_actual_value('has_cardiovascular', value)
         has_condition = safe_bool(actual_val) or safe_float(actual_val) > 0
@@ -1075,29 +1294,6 @@ def generate_factor_description(feature_name: str, value, direction: str, member
         else:
             return "No cardiovascular conditions on record."
     
-    # Respiratory
-    elif 'respiratory' in feature_lower:
-        actual_val = get_actual_value('has_respiratory', value)
-        has_condition = safe_bool(actual_val) or safe_float(actual_val) > 0
-        if has_condition and is_positive:
-            return "Their respiratory health needs align well with this offer."
-        elif has_condition:
-            return "Respiratory health is noted, but other needs may be more pressing."
-        else:
-            return "No respiratory conditions on record."
-    
-    # Mental health
-    elif 'mental_health' in feature_lower or 'mental health' in feature_lower:
-        actual_val = get_actual_value('has_mental_health', value)
-        has_condition = safe_bool(actual_val) or safe_float(actual_val) > 0
-        if has_condition and is_positive:
-            return "Their mental health journey makes this supportive program a great fit."
-        elif has_condition:
-            return "Mental wellness is important, though other programs may help more."
-        else:
-            return "No mental health history on record."
-    
-    # Chronic conditions
     elif 'chronic_condition' in feature_lower or 'chronic condition' in feature_lower:
         actual_count = get_actual_value('chronic_condition_count', value)
         count = int(safe_float(actual_count))
@@ -1110,7 +1306,6 @@ def generate_factor_description(feature_name: str, value, direction: str, member
         else:
             return "No chronic conditions on record."
     
-    # Claims
     elif 'claim' in feature_lower:
         actual_claims = get_actual_value('total_claims', value)
         count = int(safe_float(actual_claims))
@@ -1125,85 +1320,12 @@ def generate_factor_description(feature_name: str, value, direction: str, member
             else:
                 return "Their claims history suggests other approaches may resonate more."
     
-    # Utilization
-    elif 'utilization' in feature_lower:
-        actual_util = get_actual_value('avg_utilization_rate', value)
-        rate = safe_float(actual_util)
-        pct = rate * 100 if rate <= 1 else rate
-        if is_positive:
-            return f"Their benefits usage shows they actively use their coverage."
-        else:
-            return f"Their utilization pattern suggests other priorities."
-    
-    # Pharmacy
-    elif 'pharmacy' in feature_lower or 'rx' in feature_lower:
-        if is_positive:
-            return "Their prescription needs make pharmacy-related benefits valuable."
-        else:
-            return "Their pharmacy usage suggests other benefits may be more impactful."
-    
-    # Tenure
-    elif 'tenure' in feature_lower:
-        actual_tenure = get_actual_value('tenure_months', value)
-        months = int(safe_float(actual_tenure))
-        years = months // 12
-        if months > 0:
-            if is_positive:
-                if years >= 1:
-                    return f"As a member for {years}+ year(s), they've built a relationship with us."
-                else:
-                    return f"At {months} months, they're getting familiar with available benefits."
-            else:
-                return "Their membership tenure is a factor in prioritization."
-        else:
-            if is_positive:
-                return "Their membership history shows a relationship with us."
-            else:
-                return "Their membership tenure is one factor considered."
-    
-    elif 'senior' in feature_lower:
-        actual_senior = get_actual_value('is_senior', value)
-        is_senior = safe_bool(actual_senior) or safe_float(actual_senior) > 0
-        if is_senior and is_positive:
-            return "As a senior member, age-appropriate preventive care is especially valuable."
-        elif is_senior:
-            return "Senior status is considered, though other factors drive this recommendation."
-        else:
-            return "Not yet in the senior demographic."
-    
-    elif 'complex' in feature_lower:
-        actual_complex = get_actual_value('is_complex_patient', value)
-        is_complex = safe_bool(actual_complex) or safe_float(actual_complex) > 0
-        if is_complex and is_positive:
-            return "Their complex health needs make coordinated care programs especially helpful."
-        elif is_complex:
-            return "Complex care needs noted, but other programs may be more targeted."
-        else:
-            return "Health needs are straightforward at this time."
-    
-    elif 'deductible' in feature_lower:
-        if is_positive:
-            return "Their deductible status makes cost-saving programs timely."
-        else:
-            return "Their deductible status is one factor considered."
-    
-    # High risk flag
-    elif 'high_risk' in feature_lower or 'high risk' in feature_lower:
-        actual_risk = get_actual_value('high_risk_flag', value)
-        is_high_risk = safe_bool(actual_risk) or safe_float(actual_risk) > 0
-        if is_high_risk and is_positive:
-            return "Their elevated health risk makes preventive programs especially valuable."
-        elif is_high_risk:
-            return "Their risk level is considered, but other factors take priority here."
-        else:
-            return "Their current risk level is within normal range."
-    
     else:
-        # Generic description - avoid showing potentially incorrect numeric values
         if is_positive:
             return "This factor positively supports this recommendation."
         else:
             return "This factor was considered in the overall assessment."
+
 
 def create_offer_card(rec, member_id):
     """Create an offer recommendation card with feedback buttons."""
@@ -1218,7 +1340,6 @@ def create_offer_card(rec, member_id):
         pass
     
     # Build human-readable SHAP factors display
-    # Pass the full rec as member_profile so we can get accurate values
     member_profile = {
         'age': rec.get('age'),
         'risk_score': rec.get('risk_score'),
@@ -1237,7 +1358,7 @@ def create_offer_card(rec, member_id):
     }
     
     shap_items = []
-    for factor in shap_factors[:5]:  # Top 5 factors
+    for factor in shap_factors[:5]:
         feature_name = factor.get('feature', '')
         direction = factor.get('direction', 'increases')
         value = factor.get('value')
@@ -1364,6 +1485,7 @@ def create_offer_card(rec, member_id):
         
     ], style=styles['offer_card'])
 
+
 @app.callback(
     Output({'type': 'explain-content', 'member': dash.MATCH, 'offer': dash.MATCH}, 'style'),
     Output({'type': 'explain-btn', 'member': dash.MATCH, 'offer': dash.MATCH}, 'children'),
@@ -1376,21 +1498,21 @@ def toggle_explain_section(n_clicks):
     if n_clicks is None:
         return dash.no_update, dash.no_update, dash.no_update
     
-    # Toggle based on odd/even clicks
     is_open = n_clicks % 2 == 1
     
     if is_open:
         return (
-            {'display': 'block'},  # Show content
-            ["Hide Decision Factors"],  # Update button text
-            styles['explain_button_active']  # Active button style
+            {'display': 'block'},
+            ["Hide Decision Factors"],
+            styles['explain_button_active']
         )
     else:
         return (
-            {'display': 'none'},  # Hide content
-            ["View Decision Factors"],  # Reset button text
-            styles['explain_button']  # Default button style
+            {'display': 'none'},
+            ["View Decision Factors"],
+            styles['explain_button']
         )
+
 
 @app.callback(
     Output({'type': 'feedback-status', 'member': dash.MATCH, 'offer': dash.MATCH}, 'children'),
@@ -1408,11 +1530,9 @@ def handle_feedback(approve_clicks, reject_clicks):
     if not ctx.triggered:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
-    # Get which button was clicked
     triggered = ctx.triggered[0]
     prop_id = triggered['prop_id']
     
-    # Parse the button ID to get member and offer
     button_info = json.loads(prop_id.split('.')[0])
     member_id = button_info['member']
     offer_id = button_info['offer']
@@ -1425,8 +1545,8 @@ def handle_feedback(approve_clicks, reject_clicks):
         return (
             status_text,
             styles['feedback_approved'],
-            True,  # Disable approve button
-            True   # Disable reject button
+            True,
+            True
         )
     elif button_type == 'reject-btn' and reject_clicks:
         feedback = 'rejected'
@@ -1435,11 +1555,12 @@ def handle_feedback(approve_clicks, reject_clicks):
         return (
             status_text,
             styles['feedback_rejected'],
-            True,  # Disable approve button
-            True   # Disable reject button
+            True,
+            True
         )
     
     return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
 
 @app.callback(
     Output({'type': 'text-feedback-status', 'member': dash.MATCH, 'offer': dash.MATCH}, 'children'),
@@ -1457,7 +1578,6 @@ def handle_text_feedback(n_clicks, feedback_text):
     if not ctx.triggered or not n_clicks:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
-    # Get the button ID to extract member and offer
     triggered = ctx.triggered[0]
     prop_id = triggered['prop_id']
     button_info = json.loads(prop_id.split('.')[0])
@@ -1472,7 +1592,6 @@ def handle_text_feedback(n_clicks, feedback_text):
             False
         )
     
-    # Save the text feedback
     saved = save_feedback(member_id, offer_id, 'comment', feedback_text.strip())
     status_text = "✓ Comment submitted!" if saved else "⚠️ Comment logged (DB save failed)"
     status_style = styles['feedback_submitted'] if saved else {'color': '#d69e2e', 'fontSize': '14px'}
@@ -1480,10 +1599,11 @@ def handle_text_feedback(n_clicks, feedback_text):
     return (
         status_text,
         status_style,
-        True,   # Disable submit button
-        True    # Disable textarea
+        True,
+        True
     )
 
+
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=8050)
+    app.run_server(debug=True, host='0.0.0.0', port=8000)
 

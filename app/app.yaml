@@ -1,5 +1,28 @@
+# Offer Management Console - Lakebase Version
+# 
+# This app uses Databricks Lakebase for fast data retrieval.
+# 
+# SETUP INSTRUCTIONS:
+# 1. Deploy this app to Databricks Apps
+# 2. In the App settings, add a "Database" resource:
+#    - Key: database
+#    - Database: demos (your catalog)
+#    - Instance: offer-prioritization (your Lakebase instance)
+# 3. Grant "Can connect and create" permissions
+# 
+# The PG* environment variables (PGHOST, PGDATABASE, PGUSER, PGPASSWORD, etc.)
+# will be automatically injected when the Database resource is linked.
+
 command: ["python", "app.py"]
+
 env:
-  # SQL Warehouse ID for query execution (get from SQL Warehouse settings)
+  # Flask/Dash settings
+  - name: FLASK_RUN_HOST
+    value: "0.0.0.0"
+  - name: FLASK_RUN_PORT
+    value: "8000"
+  # Databricks SQL Warehouse ID (required for writing feedback to Delta tables)
+  # Get this from your SQL Warehouse details page
   - name: DATABRICKS_WAREHOUSE_ID
-    value: ""  # Set this to your SQL warehouse ID (not the HTTP path, just the ID)
+    value: ""
+
