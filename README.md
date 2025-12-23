@@ -193,7 +193,8 @@ offer_prioritization/
 │   ├── 01_data_exploration.py    # Data loading and exploratory analysis
 │   ├── 02_feature_engineering.py # Feature creation and analysis
 │   ├── 03_model_training.py      # Model training with MLflow tracking
-│   └── 04_model_inference.py     # Inference, SHAP explanations, LLM reasoning
+│   ├── 04_model_inference.py     # Inference, SHAP explanations, LLM reasoning
+│   └── 05_model_retraining.py    # Feedback-based retraining & challenger registration
 │
 ├── 📁 utils/
 │   ├── __init__.py
@@ -430,6 +431,7 @@ Run the notebooks in order:
 02_feature_engineering.py →  Create ML features
 03_model_training.py      →  Train and register model
 04_model_inference.py     →  Generate recommendations
+05_model_retraining.py    →  Retrain with feedback & register challenger
 ```
 
 ---
@@ -665,6 +667,63 @@ feedback_df = spark.sql("""
     GROUP BY offer_id
     ORDER BY total_feedback DESC
 """)
+```
+
+### Automated Model Retraining with Notebook 05
+
+The **`05_model_retraining.py`** notebook provides an end-to-end workflow to:
+
+1. **Load feedback** from `offer_feedback` Delta table
+2. **Adjust target scores** based on user preferences:
+   - Approved offers: +15 points boost
+   - Rejected offers: -20 points penalty
+3. **Retrain the model** with feedback-weighted data
+4. **Compare with champion** model metrics
+5. **Register as challenger** in Unity Catalog with `@challenger` alias
+
+```python
+# Key configuration parameters in notebook 05
+FEEDBACK_SETTINGS = {
+    "approved_boost": 15.0,      # Score increase for approved offers
+    "rejected_penalty": -20.0,   # Score decrease for rejected offers
+    "min_feedback_count": 10,    # Minimum feedback to trigger retraining
+    "feedback_weight": 0.3,      # Emphasis on feedback samples (30%)
+}
+```
+
+#### Champion vs Challenger Model Management
+
+The notebook registers retrained models with the `@challenger` alias:
+
+```
+models:/demos.offer_prioritization.healthcare_offer_prioritizer@champion  → Current production model
+models:/demos.offer_prioritization.healthcare_offer_prioritizer@challenger → Feedback-enhanced model
+```
+
+To promote the challenger to champion:
+```python
+# In notebook 05
+promote_challenger_to_champion(MODEL_NAME, CATALOG_NAME, SCHEMA_NAME, challenger_version)
+```
+
+#### Scheduling Automatic Retraining
+
+Create a Databricks Job to run notebook 05 on a schedule:
+
+```json
+{
+    "name": "Weekly Model Retraining",
+    "schedule": {
+        "quartz_cron_expression": "0 0 2 ? * SUN *",
+        "timezone_id": "America/New_York"
+    },
+    "tasks": [{
+        "task_key": "retrain_with_feedback",
+        "notebook_task": {
+            "notebook_path": "/Repos/project/notebooks/05_model_retraining"
+        }
+    }]
+}
 ```
 
 ---
