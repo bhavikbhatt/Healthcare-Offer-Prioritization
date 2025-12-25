@@ -124,7 +124,7 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 │  ┌──────────────┐    ┌──────────────┐                                 │
 │  │    SHAP      │───▶│  Foundation  │                                 │
 │  │  Explainer   │    │  Model API   │                                 │
-│  │              │    │  (LLaMA 3.1) │                                 │
+│  │              │    │  (GPT 5.1)   │                                 │
 │  └──────────────┘    └──────┬───────┘                                 │
 │                              │                                         │
 │                              ▼                                         │
@@ -540,7 +540,7 @@ The system generates natural language explanations for each recommendation.
 
 ```python
 # Set your LLM endpoint
-LLM_ENDPOINT_NAME = "databricks-meta-llama-3-1-70b-instruct"
+LLM_ENDPOINT_NAME = "databricks-gpt-5-1"
 
 # Or use a custom model serving endpoint
 LLM_ENDPOINT_NAME = "your-custom-endpoint"
@@ -784,7 +784,7 @@ load_model_from_registry(MODEL_NAME, alias="champion")
 
 **Cause:** Foundation Model API not accessible
 **Solutions:**
-- Check endpoint name: `databricks-meta-llama-3-1-70b-instruct`
+- Check endpoint name: `databricks-gpt-5-1`
 - Verify Foundation Model API is enabled in your workspace
 - Check user permissions for serving endpoints
 
