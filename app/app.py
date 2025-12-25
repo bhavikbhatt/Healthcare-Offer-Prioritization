@@ -944,7 +944,7 @@ app.layout = html.Div([
             html.Span("◈", style=styles['navbar_logo']),
             html.Div([
                 html.H1("Offer Management Console", style=styles['navbar_title']),
-                html.P("Powered by Lakebase", style=styles['navbar_subtitle'])
+                html.P("Powered by Databricks", style=styles['navbar_subtitle'])
             ])
         ], style=styles['navbar_brand']),
         
