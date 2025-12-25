@@ -821,12 +821,6 @@ GRANT MODIFY ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
 
 ---
 
-## License
-
-MIT License - see LICENSE file for details.
-
----
-
 ## Contributing
 
 1. Fork the repository
@@ -838,7 +832,7 @@ MIT License - see LICENSE file for details.
 
 ## Authors
 
-Healthcare Data Science Team
+Bhavik Bhatt, Databricks
 
 ---
 
