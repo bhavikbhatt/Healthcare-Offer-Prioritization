@@ -43,9 +43,9 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 | 🔍 **Explainability** | SHAP values identify which features drove each recommendation |
 | 🤖 **LLM Reasoning** | Natural language explanations generated for each recommendation |
 | 📦 **MLflow Integration** | Full experiment tracking, model registry, and versioning |
-| ⚡ **Batch & Real-time** | Supports both batch scoring and real-time inference |
-| 🌐 **Interactive Web App** | Dash-based UI to browse members, view recommendations, and provide feedback |
-| 👍 **Feedback Collection** | Approve/reject offers and submit comments for model improvement |
+| ⚡ **Lakebase-Powered UI** | Sub-100ms data retrieval via PostgreSQL-compatible Lakebase |
+| 🌐 **Offer Management Console** | Business-friendly Dash UI with collapsible explanations |
+| 👍 **Feedback Loop** | Approve/reject offers, submit comments, and retrain models |
 
 ---
 
@@ -117,7 +117,7 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 │                                               ▼                        │
 │  ┌──────────────┐    ┌──────────────────────────────────────┐         │
 │  │  Notebook 04 │◀───│  Unity Catalog Model Registry        │         │
-│  │  Inference   │    │  healthcare_demo.offer_prioritization│         │
+│  │  Inference   │    │  demos.offer_prioritization          │         │
 │  └──────┬───────┘    │  .healthcare_offer_prioritizer       │         │
 │         │            └──────────────────────────────────────┘         │
 │         ▼                                                              │
@@ -129,7 +129,7 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 │                              │                                         │
 │                              ▼                                         │
 │  ┌──────────────────────────────────────────────────────────┐         │
-│  │                    DELTA TABLE                            │         │
+│  │                    DELTA TABLES                           │         │
 │  │  member_offer_recommendations_with_reasoning              │         │
 │  │  • Personalized offer rankings per member                │         │
 │  │  • Priority scores (0-100)                               │         │
@@ -139,13 +139,21 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 │                              │                                         │
 │                              ▼                                         │
 │  ┌──────────────────────────────────────────────────────────┐         │
-│  │                 DATABRICKS APP (Dash)                     │         │
+│  │               LAKEBASE (PostgreSQL-compatible)            │         │
+│  │  ┌────────────────────────────────────────────────────┐  │         │
+│  │  │ lakebase_offers (synced from Delta for fast reads) │  │         │
+│  │  └────────────────────────────────────────────────────┘  │         │
+│  └─────────────────────────┬────────────────────────────────┘         │
+│                              │ Fast reads via psycopg2                 │
+│                              ▼                                         │
+│  ┌──────────────────────────────────────────────────────────┐         │
+│  │           OFFER MANAGEMENT CONSOLE (Dash App)             │         │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐      │         │
 │  │  │   Member    │  │   Offer     │  │  Feedback   │      │         │
 │  │  │   Search    │  │   Cards     │  │  Buttons    │      │         │
 │  │  │             │  │ • Score     │  │ ✓ Approve   │      │         │
 │  │  │  Dropdown   │  │ • Reasoning │  │ ✗ Reject    │      │         │
-│  │  │  with 500+  │  │ • SHAP      │  │ 💬 Comments │      │         │
+│  │  │  with 500+  │  │ • Explain   │  │ 💬 Comments │      │         │
 │  │  │  members    │  │   factors   │  │             │      │         │
 │  │  └─────────────┘  └─────────────┘  └──────┬──────┘      │         │
 │  └───────────────────────────────────────────┼──────────────┘         │
@@ -160,6 +168,15 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Data Flow
+
+The application uses a hybrid approach for optimal performance:
+
+| Operation | Technology | Table | Why |
+|-----------|------------|-------|-----|
+| **READ** member recommendations | Lakebase (PostgreSQL) | `lakebase_offers` | Sub-100ms latency for interactive UI |
+| **WRITE** user feedback | Databricks SQL API | `offer_feedback` (Delta) | Direct Delta table writes for durability |
+
 ---
 
 ## Project Structure
@@ -168,9 +185,9 @@ This system solves the problem of **offer fatigue** in healthcare marketing. Ins
 offer_prioritization/
 │
 ├── 📁 app/
-│   ├── app.py                    # Dash web application for member recommendations
-│   ├── app.yaml                  # Databricks App configuration
-│   └── requirements.txt          # App-specific Python dependencies
+│   ├── app.py                    # Offer Management Console (Lakebase + Dash)
+│   ├── app.yaml                  # Databricks App config (Lakebase + SQL Warehouse)
+│   └── requirements.txt          # App dependencies (dash, psycopg2)
 │
 ├── 📁 config/
 │   ├── __init__.py
@@ -215,8 +232,8 @@ offer_prioritization/
 | **RuleBasedScorer** | `models/offer_model.py` | Generates training labels from business rules |
 | **OfferPrioritizationModel** | `models/offer_model.py` | LightGBM multi-output wrapper |
 | **OfferRecommendationEngine** | `notebooks/04_model_inference.py` | Generates recommendations with filters |
-| **Dash Web App** | `app/app.py` | Interactive UI for browsing and reviewing recommendations |
-| **Feedback System** | `app/app.py` | Collects user feedback (approve/reject/comments) |
+| **Offer Management Console** | `app/app.py` | Lakebase-powered Dash UI for browsing recommendations |
+| **Feedback System** | `app/app.py` | Collects feedback via Databricks SQL API to Delta tables |
 
 ---
 
@@ -418,8 +435,8 @@ if member.pharmacy_utilization_rate > 0.3:
 
 3. **Set up Unity Catalog** (optional, for model registry):
    ```sql
-   CREATE CATALOG IF NOT EXISTS healthcare_demo;
-   CREATE SCHEMA IF NOT EXISTS healthcare_demo.offer_prioritization;
+   CREATE CATALOG IF NOT EXISTS demos;
+   CREATE SCHEMA IF NOT EXISTS demos.offer_prioritization;
    ```
 
 ### Quick Start
@@ -550,7 +567,7 @@ LLM_ENDPOINT_NAME = "your-custom-endpoint"
 
 ## Interactive Web Application
 
-The project includes a **Dash-based web application** deployed as a Databricks App that provides a user-friendly interface for exploring recommendations and collecting feedback.
+The project includes a **Dash-based web application** called **Offer Management Console**, deployed as a Databricks App. It provides a business-friendly interface for exploring member recommendations and collecting feedback.
 
 ### Features
 
@@ -560,15 +577,17 @@ The project includes a **Dash-based web application** deployed as a Databricks A
 | 👤 **Member Profile** | Displays age, risk score, chronic conditions, tenure, and health flags |
 | 🎯 **Top 5 Offers** | Shows ranked recommendations with priority scores |
 | 💬 **LLM Reasoning** | Natural language explanation for why each offer was recommended |
-| 📊 **SHAP Factors** | Key features that influenced each recommendation with direction indicators |
+| 🔍 **Explain Button** | Collapsible decision factors for business users (click to view SHAP insights) |
 | ✓ **Approve/Reject** | One-click feedback buttons to rate recommendations |
 | 💭 **Comments** | Text input for detailed feedback on any recommendation |
+| ⚡ **Lakebase-Powered** | Sub-100ms data retrieval via PostgreSQL-compatible Lakebase |
 
 ### Screenshot
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│  🏥 Healthcare Offer Prioritization                                │
+│  📊 Offer Management Console                                       │
+│     Powered by Databricks                                          │
 ├────────────────────────────────────────────────────────────────────┤
 │  Select Member: [M00123 ▼]                                         │
 │  Total members available: 500                                      │
@@ -587,10 +606,10 @@ The project includes a **Dash-based web application** deployed as a Databricks A
 │  │ Given your diabetes diagnosis and elevated risk indicators,    ││
 │  │ this program offers personalized coaching and medication...    ││
 │  │                                                                 ││
-│  │ 📊 Key Factors                                                  ││
-│  │ • Has Diabetes         Value: 1.0    ↑ 0.234                   ││
-│  │ • Risk Score           Value: 72.3   ↑ 0.156                   ││
-│  │ • Pharmacy Utilization Value: 0.45   ↑ 0.089                   ││
+│  │ [▶ View Decision Factors]                                       ││
+│  │   📋 Diabetes Status — Strong match — Member has diabetes      ││
+│  │   📊 Risk Level — Supporting factor — Higher risk score        ││
+│  │   💊 Pharmacy Usage — Supporting factor — Active Rx usage      ││
 │  │                                                                 ││
 │  │ [✓ Approve] [✗ Reject]                                         ││
 │  │                                                                 ││
@@ -609,28 +628,65 @@ The project includes a **Dash-based web application** deployed as a Databricks A
 
 2. **Create a new app** pointing to the `app/` folder
 
-3. **Configure environment variables** in `app.yaml`:
+3. **Add a Lakebase Database Resource** in the App settings:
+   - **Type:** Database
+   - **Key:** `database`
+   - **Database:** `demos` (your Unity Catalog catalog)
+   - **Instance:** `offer-prioritization` (your Lakebase instance name)
+   
+   This auto-injects `PGHOST`, `PGDATABASE`, `PGUSER` environment variables.
+
+4. **Create a Lakebase synced table** for fast reads:
+   ```sql
+   -- In your Lakebase instance, create a synced table from your recommendations
+   -- This syncs the Delta table to Lakebase for low-latency PostgreSQL queries
+   CREATE TABLE offer_prioritization.lakebase_offers
+   SYNC FROM demos.offer_prioritization.member_offer_recommendations_with_reasoning;
+   ```
+
+5. **Configure environment variables** in `app.yaml`:
    ```yaml
-   command:
-     - python
-     - app.py
+   command: ["python", "app.py"]
    env:
+     - name: FLASK_RUN_HOST
+       value: "0.0.0.0"
+     - name: FLASK_RUN_PORT
+       value: "8000"
+     # Required for writing feedback to Delta tables
      - name: DATABRICKS_WAREHOUSE_ID
        value: "your-sql-warehouse-id"
    ```
 
-4. **Grant permissions** to the App's service principal:
+6. **Grant permissions** to the App's service principal:
    ```sql
-   -- Grant access to recommendations table
-   GRANT SELECT ON TABLE demos.offer_prioritization.member_offer_recommendations_with_reasoning 
+   -- Grant access to Lakebase synced table (for reads)
+   GRANT SELECT ON TABLE demos.offer_prioritization.lakebase_offers
    TO `<app-service-principal>`;
    
-   -- Grant ability to write feedback
+   -- Grant ability to write feedback to Delta table
    GRANT CREATE TABLE ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
    GRANT MODIFY ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
    ```
 
-5. **Deploy** and access via the provided URL
+7. **Deploy** and access via the provided URL
+
+### Lakebase Integration
+
+The app uses **Databricks Lakebase** for fast data retrieval:
+
+| Component | Purpose |
+|-----------|---------|
+| **Lakebase Instance** | PostgreSQL-compatible endpoint for low-latency queries |
+| **Synced Table** | `lakebase_offers` - mirrors Delta table in Lakebase |
+| **Authentication** | Service principal OAuth (auto-generated from `DATABRICKS_CLIENT_ID/SECRET`) |
+| **Connection** | Uses `psycopg2` Python driver for PostgreSQL |
+
+**How it works:**
+1. App starts and reads `PGHOST`, `PGDATABASE`, `PGUSER` from environment
+2. Uses `DATABRICKS_CLIENT_ID` and `DATABRICKS_CLIENT_SECRET` to generate OAuth token
+3. Connects to Lakebase via PostgreSQL protocol (`psycopg2`)
+4. Queries `lakebase_offers` for member recommendations (sub-100ms)
+5. Writes feedback directly to Delta table via Databricks SQL API
 
 ### Feedback Data Schema
 
@@ -735,7 +791,7 @@ Create a Databricks Job to run notebook 05 on a schedule:
 ```python
 @dataclass
 class DatabricksConfig:
-    catalog_name: str = "healthcare_demo"
+    catalog_name: str = "demos"
     schema_name: str = "offer_prioritization"
     experiment_name: str = "/Shared/healthcare_offer_prioritization"
     model_name: str = "healthcare_offer_prioritizer"
@@ -748,6 +804,19 @@ class DatabricksConfig:
 | `OPENAI_API_KEY` | API key for external LLM (if not using Databricks) |
 | `OPENAI_BASE_URL` | Custom API endpoint URL |
 | `DATABRICKS_TOKEN` | Databricks PAT (auto-set in workspace) |
+
+### Environment Variables (for Databricks App)
+
+| Variable | Purpose | Auto-Injected? |
+|----------|---------|----------------|
+| `PGHOST` | Lakebase PostgreSQL endpoint | ✓ (via Database resource) |
+| `PGDATABASE` | Catalog name | ✓ (via Database resource) |
+| `PGUSER` | Service principal ID | ✓ (via Database resource) |
+| `PGPORT` | PostgreSQL port (default: 5432) | ✓ (via Database resource) |
+| `DATABRICKS_CLIENT_ID` | Service principal client ID | ✓ (auto-injected) |
+| `DATABRICKS_CLIENT_SECRET` | Service principal secret | ✓ (auto-injected) |
+| `DATABRICKS_HOST` | Workspace URL | ✓ (auto-injected) |
+| `DATABRICKS_WAREHOUSE_ID` | SQL Warehouse for Delta writes | ✗ (set in app.yaml) |
 
 ---
 
@@ -790,27 +859,54 @@ load_model_from_registry(MODEL_NAME, alias="champion")
 
 #### 6. App shows "No members found" or empty data
 
-**Cause:** App service principal lacks table permissions
+**Cause:** Lakebase synced table missing or no permissions
 **Solutions:**
 ```sql
-GRANT SELECT ON TABLE demos.offer_prioritization.member_offer_recommendations_with_reasoning 
+-- Ensure the synced table exists in Lakebase
+-- Grant SELECT on the Lakebase table
+GRANT SELECT ON TABLE demos.offer_prioritization.lakebase_offers
 TO `<app-service-principal>`;
 ```
 
 #### 7. Feedback shows "(not saved)" after approve/reject
 
-**Cause:** App cannot create or write to feedback table
+**Cause:** App cannot write to Delta feedback table via SQL API
 **Solutions:**
 ```sql
 -- Grant permissions to create and write tables
 GRANT CREATE TABLE ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
 GRANT MODIFY ON SCHEMA demos.offer_prioritization TO `<app-service-principal>`;
 ```
+Also verify `DATABRICKS_WAREHOUSE_ID` is set in `app.yaml`.
 
 #### 8. `ValueError: Unknown format code 'f' for object of type 'str'`
 
 **Cause:** Database returns string values that need numeric formatting
 **Solution:** Already fixed - app uses `safe_float()`, `safe_int()`, `safe_bool()` helpers
+
+#### 9. Lakebase connection error: `PGHOST not configured`
+
+**Cause:** Missing Database resource in Databricks App settings
+**Solution:** 
+1. Go to App settings → Resources
+2. Add a Database resource with key `database`
+3. Select your Lakebase instance
+
+#### 10. Lakebase error: `relation "schema.table" does not exist`
+
+**Cause:** Lakebase table name format issue
+**Solution:** Lakebase uses `schema.table` format within the catalog (PGDATABASE). Ensure:
+- The synced table `lakebase_offers` exists in the `offer_prioritization` schema
+- The app connects to the correct catalog (set via `PGDATABASE`)
+
+#### 11. Lakebase error: `permission denied for schema`
+
+**Cause:** Service principal lacks Lakebase schema permissions
+**Solution:** Grant PostgreSQL-style permissions in Lakebase:
+```sql
+GRANT USAGE ON SCHEMA offer_prioritization TO `<app-service-principal>`;
+GRANT SELECT ON ALL TABLES IN SCHEMA offer_prioritization TO `<app-service-principal>`;
+```
 
 ### Getting Help
 
