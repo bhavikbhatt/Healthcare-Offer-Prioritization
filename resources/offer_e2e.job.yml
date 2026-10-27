@@ -1,0 +1,71 @@
+resources:
+  jobs:
+    offer_prioritization_e2e:
+      name: offer-prioritization-e2e
+      description: >
+        End-to-end Healthcare Offer Prioritization journey: land raw extracts ->
+        Lakeflow medallion pipeline -> features + model training (UC registry) ->
+        batch scoring + SHAP + LLM reasoning -> Lakebase serving -> UC governance ->
+        Genie Agent. Serverless throughout.
+      max_concurrent_runs: 1
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+      tags:
+        project: healthcare-offer-prioritization
+        data: synthetic
+      tasks:
+        - task_key: land_raw_data
+          notebook_task:
+            notebook_path: ../src/jobs/00_land_raw_data.py
+            base_parameters:
+              n_members: ${var.n_members}
+
+        - task_key: lakeflow_medallion
+          depends_on:
+            - task_key: land_raw_data
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.offer_medallion.id}
+
+        - task_key: train_register_model
+          depends_on:
+            - task_key: lakeflow_medallion
+          notebook_task:
+            notebook_path: ../src/jobs/02_train_register_model.py
+
+        - task_key: batch_inference_reasoning
+          depends_on:
+            - task_key: train_register_model
+          notebook_task:
+            notebook_path: ../src/jobs/03_batch_inference_reasoning.py
+            base_parameters:
+              llm_sample: ${var.llm_sample}
+              llm_endpoint: ${var.llm_endpoint}
+
+        - task_key: serve_lakebase
+          depends_on:
+            - task_key: batch_inference_reasoning
+          notebook_task:
+            notebook_path: ../src/jobs/04_serve_lakebase.py
+            base_parameters:
+              lakebase_endpoint: ${var.lakebase_endpoint}
+              lakebase_host: ${var.lakebase_host}
+              app_sp_client_id: ${var.app_sp_client_id}
+
+        - task_key: uc_governance
+          depends_on:
+            - task_key: batch_inference_reasoning
+          notebook_task:
+            notebook_path: ../src/jobs/05_uc_governance.py
+            base_parameters:
+              app_sp_client_id: ${var.app_sp_client_id}
+
+        - task_key: genie_agent
+          depends_on:
+            - task_key: uc_governance
+          notebook_task:
+            notebook_path: ../src/jobs/06_genie_agent.py
+            base_parameters:
+              warehouse_id: ${var.warehouse_id}

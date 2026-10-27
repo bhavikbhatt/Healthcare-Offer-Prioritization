@@ -1,0 +1,14 @@
+resources:
+  pipelines:
+    offer_medallion:
+      name: offer-prioritization-medallion
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      photon: true
+      root_path: ../src/pipeline
+      libraries:
+        - glob:
+            include: ../src/pipeline/transformations/**
+      configuration:
+        landing_path: /Volumes/${var.catalog}/${var.schema}/raw_landing

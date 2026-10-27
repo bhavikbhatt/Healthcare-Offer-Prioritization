@@ -1,0 +1,55 @@
+# Healthcare Offer Prioritization — Databricks Asset Bundle
+#
+# One bundle deploys the whole integrated data journey:
+#   Lakeflow Spark Declarative Pipeline (bronze -> silver -> gold)
+#   -> ML training + UC model registry (champion alias)
+#   -> batch inference + SHAP + LLM reasoning
+#   -> Lakebase operational serving table
+#   -> Unity Catalog governance (comments, tags, grants)
+#   -> Genie Agent
+# and the Lakeflow Job that orchestrates it end to end.
+#
+#   databricks bundle deploy -t dev --profile <profile>
+#   databricks bundle run offer_prioritization_e2e -t dev --profile <profile>
+
+bundle:
+  name: healthcare-offer-prioritization
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for all project assets
+    default: bhavik_demos
+  schema:
+    description: Schema for all project assets
+    default: offer_prioritization
+  warehouse_id:
+    description: SQL warehouse used by the Genie Agent and the app's feedback writes
+    default: c5373a0bb5c8d31b
+  lakebase_endpoint:
+    description: Lakebase Autoscaling endpoint the app reads from
+    default: projects/offer-prioritization/branches/production/endpoints/primary
+  lakebase_host:
+    description: Host of the Lakebase endpoint
+    default: ep-sweet-shadow-d2du2zdd.database.us-east-1.cloud.databricks.com
+  app_sp_client_id:
+    description: Service principal of the offer-prioritization-console Databricks App
+    default: f9bec3ef-421b-4a07-bf08-46c6df20c976
+  n_members:
+    description: Number of synthetic members to generate per run
+    default: "5000"
+  llm_sample:
+    description: Members that get full SHAP + LLM reasoning (served to the app)
+    default: "100"
+  llm_endpoint:
+    description: Foundation Model API endpoint for recommendation reasoning
+    default: databricks-gpt-5-1
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://fevm-classic-stable-tp909z.cloud.databricks.com

@@ -24,12 +24,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 # Configuration
-CATALOG = "demos"
+# Unity Catalog location used ONLY for the Delta feedback table (written via SQL API).
+DELTA_CATALOG = os.getenv("DELTA_CATALOG", "bhavik_demos")
 SCHEMA = "offer_prioritization"
 LAKEBASE_TABLE = "lakebase_offers"
 
 # Delta table for feedback (NOT in Lakebase - written via Databricks SQL API)
-FEEDBACK_TABLE_DELTA = f"{CATALOG}.{SCHEMA}.offer_feedback"
+FEEDBACK_TABLE_DELTA = f"{DELTA_CATALOG}.{SCHEMA}.offer_feedback"
 
 # Databricks App service principal credentials (auto-injected)
 DATABRICKS_CLIENT_ID = os.getenv("DATABRICKS_CLIENT_ID", "")
@@ -38,9 +39,10 @@ DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")  # e.g., fe-vm-vdm-classic-h4
 DATABRICKS_WAREHOUSE_ID = os.getenv("DATABRICKS_WAREHOUSE_ID", "")
 
 # PostgreSQL/Lakebase connection settings
-PG_HOST = os.getenv("PGHOST", "")
+# Host comes from an explicit env var (set in app.yaml) or the resource-injected PGHOST.
+PG_HOST = os.getenv("LAKEBASE_HOST", "") or os.getenv("PGHOST", "")
 PG_PORT = os.getenv("PGPORT", "5432")
-PG_DATABASE = os.getenv("PGDATABASE", CATALOG)
+PG_DATABASE = os.getenv("PGDATABASE", "") or "databricks_postgres"
 PG_USER = os.getenv("PGUSER", "")  # Service principal ID (will use CLIENT_ID if not set)
 PG_SSLMODE = os.getenv("PGSSLMODE", "require")
 
@@ -167,14 +169,15 @@ print(f"")
 print(f"📝 Feedback Delta Table: {FEEDBACK_TABLE_DELTA}")
 
 
-def execute_databricks_sql(sql: str, wait_timeout: str = "30s"):
+def execute_databricks_sql(sql: str, wait_timeout: str = "30s", parameters: list = None):
     """
     Execute SQL against Databricks using the SQL Statement Execution API.
     This is used to write to Delta tables (not Lakebase).
     
     Args:
-        sql: The SQL statement to execute
+        sql: The SQL statement to execute (use :name markers for values)
         wait_timeout: How long to wait for the statement to complete
+        parameters: Optional named parameters, e.g. [{"name": "member_id", "value": "MBR_1"}]
     
     Returns:
         True if successful, False otherwise
@@ -194,11 +197,14 @@ def execute_databricks_sql(sql: str, wait_timeout: str = "30s"):
     token = get_oauth_token()
     
     # Prepare request
-    payload = json.dumps({
+    body = {
         "warehouse_id": DATABRICKS_WAREHOUSE_ID,
         "statement": sql,
         "wait_timeout": wait_timeout
-    }).encode("utf-8")
+    }
+    if parameters:
+        body["parameters"] = parameters
+    payload = json.dumps(body).encode("utf-8")
     
     req = urllib.request.Request(
         api_url,
@@ -396,12 +402,18 @@ def save_feedback(member_id: str, offer_id: str, feedback: str, feedback_text: s
     ensure_feedback_table()
     
     try:
-        safe_text = feedback_text.replace("'", "''") if feedback_text else ""
+        # Named parameter markers: user-entered text is never spliced into SQL.
         query = f"""
-            INSERT INTO {FEEDBACK_TABLE_DELTA} (member_id, offer_id, feedback, feedback_text, feedback_time) 
-            VALUES ('{member_id}', '{offer_id}', '{feedback}', '{safe_text}', current_timestamp())
+            INSERT INTO {FEEDBACK_TABLE_DELTA} (member_id, offer_id, feedback, feedback_text, feedback_time)
+            VALUES (:member_id, :offer_id, :feedback, :feedback_text, current_timestamp())
         """
-        if execute_databricks_sql(query):
+        params = [
+            {"name": "member_id", "value": member_id},
+            {"name": "offer_id", "value": offer_id},
+            {"name": "feedback", "value": feedback},
+            {"name": "feedback_text", "value": feedback_text or ""},
+        ]
+        if execute_databricks_sql(query, parameters=params):
             print(f"✅ Saved to Delta table: {FEEDBACK_TABLE_DELTA}")
             return True
         return False
