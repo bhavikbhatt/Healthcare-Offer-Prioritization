@@ -1,0 +1,193 @@
+{
+  "job_id": 949741712174509,
+  "run_id": 923080212888235,
+  "run_page_url": "https://fevm-classic-stable-tp909z.cloud.databricks.com/?o=7474656617733963#job/949741712174509/run/923080212888235",
+  "state": {
+    "life_cycle_state": "TERMINATED",
+    "result_state": "SUCCESS",
+    "state_message": "",
+    "user_cancelled_or_timedout": false
+  },
+  "tasks": [
+    {
+      "task_key": "land_raw_data",
+      "result_state": "SUCCESS",
+      "duration_s": 37,
+      "notebook_exit": {
+        "batch_id": "20261027T201919Z",
+        "landed": {
+          "members": {
+            "rows": 5000,
+            "bytes": 1397304,
+            "path": "/Volumes/bhavik_demos/offer_prioritization/raw_landing/members/batch_20261027T201919Z.json"
+          },
+          "claims": {
+            "rows": 21350,
+            "bytes": 8058557,
+            "path": "/Volumes/bhavik_demos/offer_prioritization/raw_landing/claims/batch_20261027T201919Z.json"
+          },
+          "benefits_utilization": {
+            "rows": 35000,
+            "bytes": 8975284,
+            "path": "/Volumes/bhavik_demos/offer_prioritization/raw_landing/benefits_utilization/batch_20261027T201919Z.json"
+          },
+          "engagement_history": {
+            "rows": 63175,
+            "bytes": 16314799,
+            "path": "/Volumes/bhavik_demos/offer_prioritization/raw_landing/engagement_history/batch_20261027T201919Z.json"
+          }
+        },
+        "injected_defects": {
+          "members.age_out_of_range (drop)": 20,
+          "members.unknown_plan_type (warn)": 10,
+          "claims.negative_amount (drop)": 85,
+          "claims.missing_member_id (drop)": 43,
+          "claims.paid_above_billed (warn)": 64,
+          "benefits.utilization_over_100pct (drop)": 70,
+          "engagement.unknown_channel (drop)": 190
+        }
+      }
+    },
+    {
+      "task_key": "lakeflow_medallion",
+      "result_state": "SUCCESS",
+      "duration_s": 83,
+      "pipeline_id": "af3f71ac-5d82-492d-8f38-cd37284e7136",
+      "update_id": "ab4bc1f6-725c-4775-8e49-767c5f79203e"
+    },
+    {
+      "task_key": "train_register_model",
+      "result_state": "SUCCESS",
+      "duration_s": 147,
+      "notebook_exit": {
+        "batch_id": "20261027T201919Z",
+        "run_id": "4c2ee4573c4f4a7e990c704ddb057f4e",
+        "model": "bhavik_demos.offer_prioritization.healthcare_offer_prioritizer",
+        "version": "3",
+        "metrics": {
+          "train_rmse": 2.9010447051004307,
+          "test_rmse": 5.102058931073664,
+          "test_mae": 4.081618628359976,
+          "test_r2": 0.7836007792770753,
+          "test_top5_overlap": 0.8457831325301206,
+          "test_top1_accuracy": 0.8152610441767069
+        }
+      }
+    },
+    {
+      "task_key": "batch_inference_reasoning",
+      "result_state": "SUCCESS",
+      "duration_s": 205,
+      "notebook_exit": {
+        "model_version": "3",
+        "members_scored": 4980,
+        "recommendations": 24900,
+        "served_rows": 500,
+        "guardrails": {
+          "llm_generated_pct": 1.0,
+          "mentions_score_or_model_pct": 0.0,
+          "names_the_program_pct": 0.938,
+          "median_words": 89.0,
+          "over_120_words_pct": 0.0
+        }
+      }
+    },
+    {
+      "task_key": "serve_lakebase",
+      "result_state": "SUCCESS",
+      "duration_s": 29,
+      "notebook_exit": {
+        "rows": 500,
+        "members": 100,
+        "model_version": "3",
+        "latency": {
+          "n_queries": 200,
+          "p50_ms": 3.12,
+          "p95_ms": 7.21,
+          "p99_ms": 10.26,
+          "max_ms": 22.12
+        }
+      }
+    },
+    {
+      "task_key": "uc_governance",
+      "result_state": "SUCCESS",
+      "duration_s": 81,
+      "notebook_exit": {
+        "applied": 45,
+        "skipped": [
+          "ALTER SCHEMA bhavik_demos.offer_prioritization SET TAGS ('domain' = 'Healthcare', 'use_case' = 'next_best_offer', 'data_classification' = 'synthetic')  -- [RequestId=ba642d6d-4b00-4bd3-99df-223b39657dd1 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.bronze_members SET TAGS ('medallion_layer' = 'bronze', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=abd6073a-01a7-41f4-8304-38e3b1bd4180 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.bronze_claims SET TAGS ('medallion_layer' = 'bronze', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=4dacef52-8709-4870-b519-63af5646069d ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.bronze_benefits_utilization SET TAGS ('medallion_layer' = 'bronze', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=d495f7b0-7d44-4016-93ed-f5f8ba828d74 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.bronze_engagement_history SET TAGS ('medallion_layer' = 'bronze', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=62ec96c4-d6d8-4810-8400-4b9d24bcdedc ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.silver_members SET TAGS ('medallion_layer' = 'silver', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=3cddfa6d-eb3b-4c15-a0fe-296f0424887a ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.silver_claims SET TAGS ('medallion_layer' = 'silver', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=a5ec7b60-b943-47a2-bec9-2f28b4c69c74 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.silver_benefits_utilization SET TAGS ('medallion_layer' = 'silver', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=07521171-f96c-4f9b-ba75-749ae316ff1c ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER STREAMING TABLE bhavik_demos.offer_prioritization.silver_engagement_history SET TAGS ('medallion_layer' = 'silver', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=e6805e3c-ca79-4885-ac36-470b1475d32a ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER MATERIALIZED VIEW bhavik_demos.offer_prioritization.gold_member_360 SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=aeb372a0-a794-4b7e-bc9a-790097c76200 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER MATERIALIZED VIEW bhavik_demos.offer_prioritization.gold_claims_monthly SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=714a1eec-828a-4109-a3b0-0f36974fd94d ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER MATERIALIZED VIEW bhavik_demos.offer_prioritization.gold_engagement_performance SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=c6441bf8-cfeb-49e5-b65d-49121bbd4ab9 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.member_features SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=bae160dc-2bd5-4adb-b291-13997a1086c2 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.offer_catalog SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=f9325c19-4597-4a4c-9555-e31edd05fdbc ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.offer_recommendations SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=7fb7c77f-d8a0-4015-9010-a2b672778eb1 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.member_offer_recommendations_with_reasoning SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=d831149c-9248-47e9-a61d-a245300fdc33 ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.model_feature_importance SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=819119df-b92f-454d-a933-298b4dc99c1d ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is ",
+          "ALTER TABLE bhavik_demos.offer_prioritization.offer_feedback SET TAGS ('medallion_layer' = 'gold', 'domain' = 'Healthcare', 'data_classification' = 'synthetic_phi')  -- [RequestId=a4ce9e69-0aa6-425f-8c5e-86a3579cba9c ErrorClass=INVALID_PARAMETER_VALUE.UC_TAG_POLICY_VALUE_NOT_ALLOWED] Tag value Healthcare is "
+        ]
+      }
+    },
+    {
+      "task_key": "genie_agent",
+      "result_state": "SUCCESS",
+      "duration_s": 105,
+      "notebook_exit": {
+        "space_id": "01f1d2431e1c1007bbd755dc7cc91fbb",
+        "url": "https://fevm-classic-stable-tp909z.cloud.databricks.com/genie/rooms/01f1d2431e1c1007bbd755dc7cc91fbb",
+        "answered": 5,
+        "asked": 5
+      }
+    },
+    {
+      "task_key": "uc_governance",
+      "result_state": "SUCCESS",
+      "duration_s": 119,
+      "notebook_exit": {
+        "applied": 63,
+        "skipped": []
+      }
+    },
+    {
+      "task_key": "uc_governance",
+      "result_state": "SUCCESS",
+      "duration_s": 108,
+      "notebook_exit": {
+        "applied": 63,
+        "skipped": []
+      }
+    },
+    {
+      "task_key": "genie_agent",
+      "result_state": "SUCCESS",
+      "duration_s": 115,
+      "notebook_exit": {
+        "space_id": "01f1d2431e1c1007bbd755dc7cc91fbb",
+        "url": "https://fevm-classic-stable-tp909z.cloud.databricks.com/genie/rooms/01f1d2431e1c1007bbd755dc7cc91fbb",
+        "answered": 5,
+        "asked": 5
+      }
+    },
+    {
+      "task_key": "genie_agent",
+      "result_state": "SUCCESS",
+      "duration_s": 100,
+      "notebook_exit": {
+        "space_id": "01f1d2431e1c1007bbd755dc7cc91fbb",
+        "url": "https://fevm-classic-stable-tp909z.cloud.databricks.com/genie/rooms/01f1d2431e1c1007bbd755dc7cc91fbb",
+        "answered": 5,
+        "clarifying": 0,
+        "asked": 5
+      }
+    }
+  ]
+}

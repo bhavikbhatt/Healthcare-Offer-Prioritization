@@ -1,5 +1,10 @@
 # Healthcare Offer Prioritization System
 
+> **FE Bar build submission:** start at **[SUBMISSION.md](SUBMISSION.md)**. It maps each required stage
+> (Lakeflow → Unity Catalog → Lakebase → ML/GenAI → Genie Agent → Databricks App) to its code and to the
+> committed execution evidence in [`evidence/`](evidence/). Deploy and run everything with the Asset Bundle:
+> `databricks bundle deploy -t dev && databricks bundle run offer_prioritization_e2e -t dev`.
+
 An end-to-end machine learning system built on Databricks that personalizes healthcare offers for insurance members. The system analyzes member demographics, claims history, benefits utilization, and engagement patterns to rank and recommend the most relevant healthcare programs for each individual.
 
 ---

@@ -1,28 +1,29 @@
 # Offer Management Console - Lakebase Version
-# 
-# This app uses Databricks Lakebase for fast data retrieval.
-# 
-# SETUP INSTRUCTIONS:
-# 1. Deploy this app to Databricks Apps
-# 2. In the App settings, add a "Database" resource:
-#    - Key: database
-#    - Database: demos (your catalog)
-#    - Instance: offer-prioritization (your Lakebase instance)
-# 3. Grant "Can connect and create" permissions
-# 
-# The PG* environment variables (PGHOST, PGDATABASE, PGUSER, PGPASSWORD, etc.)
-# will be automatically injected when the Database resource is linked.
+#
+# Reads recommendations from the Lakebase Postgres table
+# offer_prioritization.lakebase_offers (database databricks_postgres) and writes
+# feedback to the Delta table bhavik_demos.offer_prioritization.offer_feedback via
+# the SQL Statement Execution API.
+#
+# A `postgres` app resource (Lakebase project offer-prioritization) provisions the
+# app service principal's Postgres role so it can connect. The app mints its own
+# OAuth token (DATABRICKS_CLIENT_ID/SECRET) for both Lakebase and the SQL API.
 
 command: ["python", "app.py"]
 
 env:
-  # Flask/Dash settings
   - name: FLASK_RUN_HOST
     value: "0.0.0.0"
   - name: FLASK_RUN_PORT
     value: "8000"
-  # Databricks SQL Warehouse ID (required for writing feedback to Delta tables)
-  # Get this from your SQL Warehouse details page
+  # Lakebase primary endpoint host for the offer-prioritization project
+  - name: LAKEBASE_HOST
+    value: "ep-sweet-shadow-d2du2zdd.database.us-east-1.cloud.databricks.com"
+  - name: PGDATABASE
+    value: "databricks_postgres"
+  # SQL Warehouse used to write feedback to the Delta table
   - name: DATABRICKS_WAREHOUSE_ID
-    value: ""
-
+    value: "c5373a0bb5c8d31b"
+  # Unity Catalog that holds the Delta feedback table
+  - name: DELTA_CATALOG
+    value: "bhavik_demos"
